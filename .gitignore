@@ -27,3 +27,12 @@ playwright-report
 *.njsproj
 *.sln
 *.sw?
+
+# Local tooling / agent state (never publish)
+.claude/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
