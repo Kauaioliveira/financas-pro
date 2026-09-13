@@ -8,11 +8,14 @@ import {
   Pencil,
   Plus,
   Receipt,
+  Upload,
 } from 'lucide-react';
 import { useFinance } from '../context/useFinance';
+import { useImportDraft } from '../context/useImportDraft';
 import type { CardAccount, ExpenseBreakdown, ExpenseBreakdownItem } from '../types';
 import { formatCurrency, formatDate, getMonthLabel } from '../utils/parser';
 import { CardAccountModal } from './CardAccountModal';
+import { CardStatementImport } from './CardStatementImport';
 
 export function CreditCardView() {
   const {
@@ -27,6 +30,11 @@ export function CreditCardView() {
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CardAccount | null>(null);
+  const { cardDraft } = useImportDraft();
+  // Reabre a importação com a pré-visualização pendente ao voltar para a aba.
+  const [importState, setImportState] = useState<'closed' | 'restored' | 'opened'>(() =>
+    cardDraft ? 'restored' : 'closed'
+  );
 
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
@@ -90,13 +98,25 @@ export function CreditCardView() {
                 Compras ficam separadas do caixa mensal e so entram no painel quando a fatura realmente vence.
               </p>
             </div>
-            <button
-              onClick={openNewCard}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_18px_40px_rgba(34,211,238,0.25)] transition hover:-translate-y-[1px]"
-            >
-              <Plus className="h-4 w-4" />
-              Novo cartao
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setImportState('opened')}
+                aria-expanded={importState !== 'closed'}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(34,211,238,0.18)] transition hover:-translate-y-[1px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+                style={{ background: 'linear-gradient(135deg, #22d3ee, #3b82f6)' }}
+              >
+                <Upload className="h-4 w-4" />
+                Importar fatura
+              </button>
+              <button
+                onClick={openNewCard}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_18px_40px_rgba(34,211,238,0.25)] transition hover:-translate-y-[1px]"
+              >
+                <Plus className="h-4 w-4" />
+                Novo cartao
+              </button>
+            </div>
           </div>
         </div>
 
@@ -119,6 +139,14 @@ export function CreditCardView() {
           detail={nextInvoice ? `Proxima: ${formatDate(nextInvoice.dueDate)}` : 'Nenhuma fatura pendente'}
         />
       </section>
+
+      {importState !== 'closed' && (
+        <CardStatementImport
+          key={importState}
+          autoFocus={importState === 'opened'}
+          onClose={() => setImportState('closed')}
+        />
+      )}
 
       <section className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -254,7 +282,7 @@ export function CreditCardView() {
 
           <div className="mt-5 space-y-3">
             {cardInvoices.length === 0 ? (
-              <EmptyBlock message="Ainda nao ha faturas calculadas. Importe um CSV ou PDF na aba de importacao." />
+              <EmptyBlock message="Ainda não há faturas calculadas. Use Importar fatura, no topo desta aba, para enviar o CSV ou PDF do cartão." />
             ) : (
               cardInvoices.map(invoice => {
                 const expanded = expandedInvoice === invoice.id;

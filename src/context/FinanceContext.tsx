@@ -15,7 +15,7 @@ import type {
 } from '../types';
 import { loadVaultData, saveVaultData } from '../utils/secureStorage';
 import { categorizeTransaction, guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
-import { mergeImportedTransactions } from '../utils/importMerge';
+import { mergeImportedCardPurchases, mergeImportedTransactions } from '../utils/importMerge';
 import type { ImportMergeResult } from '../utils/importMerge';
 import { getInvoiceCloseDate, getInvoiceDueDate, getInvoiceStatus } from '../utils/credit';
 import { FinanceContext } from './FinanceContext.shared';
@@ -226,23 +226,19 @@ export function FinanceProvider({
     );
   }, []);
 
-  const addCardPurchases = useCallback((incomingPurchases: CardPurchase[]) => {
-    setStoredCardPurchases(prev => {
-      const existingIds = new Set(prev.map(purchase => purchase.id));
-      const existingKeys = new Set(
-        prev.map(
-          purchase =>
-            `${purchase.cardId}|${purchase.date}|${purchase.description}|${purchase.amount}|${purchase.sourceName}`
-        )
-      );
-      const deduped = incomingPurchases.filter(purchase => {
-        if (existingIds.has(purchase.id)) return false;
-        const key = `${purchase.cardId}|${purchase.date}|${purchase.description}|${purchase.amount}|${purchase.sourceName}`;
-        return !existingKeys.has(key);
-      });
-      return [...prev, ...deduped];
-    });
-  }, []);
+  const addCardPurchases = useCallback(
+    (incomingPurchases: CardPurchase[]): ImportMergeResult<CardPurchase> => {
+      const result = mergeImportedCardPurchases(storedCardPurchases, incomingPurchases);
+      if (result.added.length > 0) {
+        setStoredCardPurchases(prev => {
+          const ids = new Set(prev.map(purchase => purchase.id));
+          return [...prev, ...result.added.filter(purchase => !ids.has(purchase.id))];
+        });
+      }
+      return result;
+    },
+    [storedCardPurchases]
+  );
 
   const markInvoicePaid = useCallback((invoiceId: string, paid: boolean) => {
     setStoredInvoices(prev => {
