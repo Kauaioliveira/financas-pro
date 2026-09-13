@@ -25,7 +25,7 @@ export interface FinanceContextType {
   updateCardAccount: (card: CardAccount) => void;
   removeTransaction: (id: string) => void;
   updateTransaction: (transaction: Transaction) => void;
-  addCardPurchases: (purchases: CardPurchase[]) => void;
+  addCardPurchases: (purchases: CardPurchase[]) => ImportMergeResult<CardPurchase>;
   markInvoicePaid: (invoiceId: string, paid: boolean) => void;
   replaceTransactions: (transactions: Transaction[]) => void;
   reapplyCategories: () => void;
