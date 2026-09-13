@@ -358,7 +358,7 @@ export function parseCSV(csvText: string, bankName: string, periodInfo?: Stateme
       date: parsedDate,
       description: description.trim(),
       amount,
-      type: categorizeTransaction(description),
+      type: categorizeTransaction(description, amount),
       category: guessCategory(description),
       bank: bankName,
     });
@@ -398,7 +398,7 @@ function parseCSVNoHeader(csvText: string, bankName: string, ctx?: StatementDate
       date: parsedDate,
       description,
       amount,
-      type: categorizeTransaction(description),
+      type: categorizeTransaction(description, amount),
       category: guessCategory(description),
       bank: bankName,
     });
@@ -436,7 +436,7 @@ export function parseOFX(ofxText: string, bankName: string): Transaction[] {
       date: parsedDate,
       description,
       amount,
-      type: categorizeTransaction(description),
+      type: categorizeTransaction(description, amount),
       category: guessCategory(description),
       bank: bankName,
     });
@@ -583,7 +583,7 @@ function parseNeonBankStatementPdf(pdfText: string, bankName: string, dateCtx: S
       date: parsedDate,
       description,
       amount,
-      type: categorizeTransaction(description),
+      type: categorizeTransaction(description, amount),
       category: guessCategory(description),
       bank: bankName,
     });
@@ -686,7 +686,7 @@ function parseBanrisulBankStatementPdf(pdfText: string, bankName: string, dateCt
         date: parsedDate,
         description,
         amount,
-        type: categorizeTransaction(description),
+        type: categorizeTransaction(description, amount),
         category: guessCategory(description),
         bank: bankName,
       });
@@ -725,7 +725,7 @@ function parseBanrisulBankStatementPdf(pdfText: string, bankName: string, dateCt
       date: parsedDate,
       description,
       amount,
-      type: categorizeTransaction(description),
+      type: categorizeTransaction(description, amount),
       category: guessCategory(description),
       bank: bankName,
     });

@@ -10,13 +10,17 @@ const TRANSFER_KEYWORDS = [
   'transferencia enviada', 'transferencia recebida',
 ];
 
+// Sem "/0": casava com qualquer data ("01/08") e virava boleto em compra de cartão.
 const CREDIT_KEYWORDS = [
   'cartao', 'credito', 'fatura',
-  'compra cartao', 'parcela', 'parc ', '/0',
+  'compra cartao', 'parcela', 'parc ',
 ];
 
+// "COMPRA CARTAO DEBITO" é gasto em conta, não fatura: débito explícito vence cartão.
+const EXPLICIT_DEBIT_KEYWORDS = ['debito', 'compra debito'];
+
 const DEBIT_KEYWORDS = [
-  'debito', 'compra debito',
+  ...EXPLICIT_DEBIT_KEYWORDS,
   'pgto', 'pagamento', 'boleto', 'tarifa', 'taxa', 'anuidade',
   'saque', 'iof',
 ];
@@ -30,12 +34,17 @@ export function isInvoicePaymentTransaction(description: string, category?: stri
   );
 }
 
-export function categorizeTransaction(description: string): TransactionType {
+export function categorizeTransaction(description: string, amount?: number): TransactionType {
   const lower = description.toLowerCase().trim();
+  // Dinheiro entrando ("CREDITO SALARIO", "credito em conta") nunca é compra no cartão.
+  const isIncoming = amount !== undefined && amount > 0;
+  const isExplicitDebit = EXPLICIT_DEBIT_KEYWORDS.some(keyword => lower.includes(keyword));
 
   if (isInvoicePaymentTransaction(description)) return 'transferencia';
   if (PIX_KEYWORDS.some(keyword => lower.includes(keyword))) return 'pix';
-  if (CREDIT_KEYWORDS.some(keyword => lower.includes(keyword))) return 'credito';
+  if (!isIncoming && !isExplicitDebit && CREDIT_KEYWORDS.some(keyword => lower.includes(keyword))) {
+    return 'credito';
+  }
   if (TRANSFER_KEYWORDS.some(keyword => lower.includes(keyword))) return 'transferencia';
   if (DEBIT_KEYWORDS.some(keyword => lower.includes(keyword))) return 'debito';
 
