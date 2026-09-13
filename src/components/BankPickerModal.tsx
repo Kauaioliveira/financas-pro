@@ -71,7 +71,7 @@ export function BankPickerModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="dark-surface animate-scale-in relative w-full max-w-3xl rounded-[28px] p-6 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
+      <div className="dark-surface animate-scale-in relative max-h-[calc(100dvh-3rem)] w-full max-w-3xl overflow-y-auto rounded-[24px] p-6 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-cyan-500/12 text-cyan-200 ring-1 ring-inset ring-cyan-400/18">
             <Building2 className="h-5 w-5" />
@@ -108,7 +108,7 @@ export function BankPickerModal({
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
               Favoritos
             </p>
@@ -132,7 +132,7 @@ export function BankPickerModal({
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
               Todos os bancos
             </p>

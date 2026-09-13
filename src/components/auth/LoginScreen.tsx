@@ -40,7 +40,7 @@ export function LoginScreen({
           >
             <Wallet className="h-8 w-8" />
           </div>
-          <h1 className="font-display text-3xl font-semibold text-[color:var(--app-fg-strong)]">
+          <h1 className="font-display text-2xl font-semibold text-[color:var(--app-fg-strong)]">
             FinançasPro
           </h1>
           <p className="mt-2 text-sm text-slate-400">
@@ -50,7 +50,7 @@ export function LoginScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="dark-surface rounded-[28px] p-6 sm:p-8"
+          className="dark-surface rounded-[24px] p-6 sm:p-8"
         >
           <h2 className="text-lg font-semibold text-white">Entrar</h2>
 
@@ -107,7 +107,7 @@ export function LoginScreen({
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-200"
                 tabIndex={-1}
               >
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

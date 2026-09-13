@@ -57,8 +57,8 @@ export function Sidebar({ activeTab, onTabChange, open, onClose }: SidebarProps)
         <div className="absolute -left-16 top-18 h-56 w-56 rounded-full bg-cyan-400/12 blur-3xl" />
         <div className="absolute -right-20 bottom-20 h-56 w-56 rounded-full bg-blue-500/14 blur-3xl" />
 
-        <div className="relative z-10 flex items-start justify-between p-6 pb-8">
-          <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_48px_rgba(2,6,23,0.28)] backdrop-blur-md flex-1">
+        <div className="relative z-10 flex shrink-0 items-start justify-between p-6 pb-8">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_48px_rgba(2,6,23,0.28)] backdrop-blur-md flex-1">
             <div className="flex items-center gap-3">
               <div
                 className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_18px_40px_rgba(14,165,233,0.26)]"
@@ -91,7 +91,7 @@ export function Sidebar({ activeTab, onTabChange, open, onClose }: SidebarProps)
           </button>
         </div>
 
-        <nav className="relative z-10 flex-1 px-4 pt-2">
+        <nav className="relative z-10 min-h-0 flex-1 shrink-0 px-4 pt-2">
           <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.32em] text-slate-500">
             Navegação
           </p>
@@ -137,8 +137,8 @@ export function Sidebar({ activeTab, onTabChange, open, onClose }: SidebarProps)
           </div>
         </nav>
 
-        <div className="relative z-10 p-5">
-          <div className="rounded-[24px] border border-white/8 bg-white/[0.04] p-4 backdrop-blur-md">
+        <div className="relative z-10 shrink-0 p-5">
+          <div className="rounded-[20px] border border-white/8 bg-white/[0.04] p-4 backdrop-blur-md">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
               Armazenamento local
             </p>
