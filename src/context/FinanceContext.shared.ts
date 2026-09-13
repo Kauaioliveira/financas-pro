@@ -11,6 +11,7 @@ import type {
   MonthComparisonSummary,
   Transaction,
 } from '../types';
+import type { ImportMergeResult } from '../utils/importMerge';
 
 export interface FinanceContextType {
   transactions: Transaction[];
@@ -19,7 +20,7 @@ export interface FinanceContextType {
   cardInvoices: CardInvoice[];
   rules: CategoryRule[];
   setRules: (rules: CategoryRule[]) => void;
-  addTransactions: (newTransactions: Transaction[]) => void;
+  addTransactions: (newTransactions: Transaction[]) => ImportMergeResult;
   addCardAccount: (card: CardAccount) => void;
   updateCardAccount: (card: CardAccount) => void;
   removeTransaction: (id: string) => void;

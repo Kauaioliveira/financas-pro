@@ -14,7 +14,9 @@ import type {
   Transaction,
 } from '../types';
 import { loadVaultData, saveVaultData } from '../utils/secureStorage';
-import { guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
+import { categorizeTransaction, guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
+import { mergeImportedTransactions } from '../utils/importMerge';
+import type { ImportMergeResult } from '../utils/importMerge';
 import { getInvoiceCloseDate, getInvoiceDueDate, getInvoiceStatus } from '../utils/credit';
 import { FinanceContext } from './FinanceContext.shared';
 
@@ -195,20 +197,19 @@ export function FinanceProvider({
   const cardInvoices = recalculateInvoices(cardAccounts, storedCardPurchases, storedInvoices);
   const cardPurchases = applyPurchaseStatuses(storedCardPurchases, cardInvoices);
 
-  const addTransactions = useCallback((newTransactions: Transaction[]) => {
-    setTransactions(prev => {
-      const existingIds = new Set(prev.map(transaction => transaction.id));
-      const existingKeys = new Set(
-        prev.map(transaction => `${transaction.date}|${transaction.description}|${transaction.amount}|${transaction.bank}`)
-      );
-      const deduped = newTransactions.filter(transaction => {
-        if (existingIds.has(transaction.id)) return false;
-        const key = `${transaction.date}|${transaction.description}|${transaction.amount}|${transaction.bank}`;
-        return !existingKeys.has(key);
-      });
-      return [...prev, ...deduped];
-    });
-  }, []);
+  const addTransactions = useCallback(
+    (newTransactions: Transaction[]): ImportMergeResult => {
+      const result = mergeImportedTransactions(transactions, newTransactions);
+      if (result.added.length > 0) {
+        setTransactions(prev => {
+          const ids = new Set(prev.map(transaction => transaction.id));
+          return [...prev, ...result.added.filter(transaction => !ids.has(transaction.id))];
+        });
+      }
+      return result;
+    },
+    [transactions]
+  );
 
   const addCardAccount = useCallback((card: CardAccount) => {
     setCardAccounts(prev => {
@@ -269,6 +270,7 @@ export function FinanceProvider({
     setTransactions(prev =>
       prev.map(transaction => ({
         ...transaction,
+        type: categorizeTransaction(transaction.description, transaction.amount),
         category: guessCategory(transaction.description, rules),
       }))
     );

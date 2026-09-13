@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFinance } from '../context/useFinance';
+import { useImportDraft } from '../context/useImportDraft';
 import { parseBankStatementFile, formatCurrency, formatDate } from '../utils/parser';
-import type { BankStatementParseMeta } from '../utils/parser';
 import { getTypeLabel, getTypeColor } from '../utils/categorize';
-import type { Transaction } from '../types';
+import type { ImportMergeResult } from '../utils/importMerge';
 import {
   Upload,
   FileText,
   CheckCircle,
   AlertTriangle,
+  Info,
   X,
   Plus,
   Building2,
@@ -20,9 +21,44 @@ import { BankPickerModal } from './BankPickerModal';
 const LAST_BANK_KEY = 'financaspro_last_bank';
 const FAVORITE_BANKS_KEY = 'financaspro_favorite_banks';
 
+type ImportError = { message: string; needsBank?: boolean };
+
+function plural(count: number, one: string, many: string): string {
+  return count === 1 ? one : many;
+}
+
+function describeParseError(err: unknown): string {
+  const name = err instanceof Error ? err.name : '';
+  if (name === 'PasswordException') {
+    return 'Esse PDF está protegido por senha. Exporte o extrato de novo no app do banco sem senha, ou use OFX/CSV.';
+  }
+  if (name === 'InvalidPDFException' || name === 'MissingPDFException') {
+    return 'Esse arquivo não abriu como PDF — pode estar corrompido ou incompleto. Baixe o extrato de novo e tente outra vez.';
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return 'Confira se o arquivo é CSV, OFX, QFX ou PDF com texto selecionável.';
+}
+
+function describeImportResult({ added, skipped }: ImportMergeResult): string {
+  if (added.length === 0) {
+    return skipped.length === 1
+      ? 'Nada novo para importar: a transação deste arquivo já estava no app.'
+      : `Nada novo para importar: as ${skipped.length} transações deste arquivo já estavam no app.`;
+  }
+  const addedText = `${added.length} ${plural(added.length, 'transação importada', 'transações importadas')}`;
+  if (skipped.length === 0) return `${addedText}.`;
+  return `${addedText} · ${skipped.length} ${plural(
+    skipped.length,
+    'já existia e foi ignorada',
+    'já existiam e foram ignoradas'
+  )}.`;
+}
+
 export function ImportStatement() {
   const { addTransactions } = useFinance();
+  const { draft, setDraft } = useImportDraft();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFileRef = useRef<File | null>(null);
   const [isBankOpen, setIsBankOpen] = useState(false);
   const [bankId, setBankId] = useState<string | null>(() => {
     try {
@@ -42,13 +78,14 @@ export function ImportStatement() {
       return new Set();
     }
   });
-  const [preview, setPreview] = useState<Transaction[]>([]);
-  const [importMeta, setImportMeta] = useState<BankStatementParseMeta | null>(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [fileName, setFileName] = useState('');
+  const [error, setError] = useState<ImportError | null>(null);
+  const [importResult, setImportResult] = useState<ImportMergeResult | null>(null);
+  const [fileName, setFileName] = useState(() => draft?.fileName ?? '');
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const preview = draft?.preview ?? [];
+  const importMeta = draft?.meta ?? null;
 
   const selectedBank = useMemo(() => {
     if (!bankId) return null;
@@ -86,40 +123,50 @@ export function ImportStatement() {
   function handleSelectBank(id: string) {
     setBankId(id);
     setIsBankOpen(false);
-    setError('');
-    setSuccess('');
+    setError(null);
+    setImportResult(null);
+
+    // O arquivo que esperava pelo banco é lido agora, sem pedir de novo.
+    const pendingFile = pendingFileRef.current;
+    pendingFileRef.current = null;
+    const pickedBankName = BANKS.find(b => b.id === id)?.name;
+    if (pendingFile && pickedBankName) void handleFile(pendingFile, pickedBankName);
   }
 
-  async function handleFile(file: File) {
+  async function handleFile(file: File, bank = bankName) {
     if (isLoading) return;
-    setError('');
-    setSuccess('');
+    setError(null);
+    setImportResult(null);
     setFileName(file.name);
-    setImportMeta(null);
 
-    if (!bankName) {
-      setError('Selecione o banco antes de importar o arquivo.');
+    if (!bank) {
+      pendingFileRef.current = file;
+      setError({ message: 'Selecione o banco antes de importar o arquivo.', needsBank: true });
       return;
     }
 
     setIsLoading(true);
     try {
-      const { transactions, meta } = await parseBankStatementFile(file, bankName);
+      const { transactions, meta } = await parseBankStatementFile(file, bank);
 
       if (transactions.length === 0) {
-        setError(
-          'Nenhuma transação encontrada. Verifique se o arquivo está no formato correto (CSV, OFX, QFX ou PDF com texto selecionável).'
-        );
+        setError({
+          message:
+            'Nenhuma transação encontrada. Verifique se o arquivo está no formato correto (CSV, OFX, QFX ou PDF com texto selecionável).',
+        });
         return;
       }
 
-      setPreview(transactions);
-      setImportMeta(meta);
+      setDraft({ preview: transactions, meta, fileName: file.name });
     } catch (err) {
-      setError(`Erro ao processar arquivo: ${err instanceof Error ? err.message : 'formato inválido'}`);
+      setError({ message: describeParseError(err) });
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function openFilePicker() {
+    if (!isLoading) fileInputRef.current?.click();
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -131,22 +178,20 @@ export function ImportStatement() {
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    // Limpa já, para que escolher o mesmo arquivo de novo dispare onChange.
+    e.target.value = '';
     if (file) void handleFile(file);
   }
 
   function confirmImport() {
-    addTransactions(preview);
-    setSuccess(`${preview.length} transações importadas com sucesso!`);
-    setPreview([]);
+    setImportResult(addTransactions(preview));
+    setDraft(null);
     setFileName('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function cancelPreview() {
-    setPreview([]);
-    setImportMeta(null);
+    setDraft(null);
     setFileName('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   return (
@@ -214,7 +259,7 @@ export function ImportStatement() {
           onDragOver={e => { if (!isLoading) { e.preventDefault(); setIsDragging(true); } }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={isLoading ? undefined : handleDrop}
-          onClick={() => { if (!isLoading) fileInputRef.current?.click(); }}
+          onClick={openFilePicker}
           className={`relative border-2 border-dashed rounded-2xl p-8 sm:p-16 text-center transition-all duration-300 ${
             isLoading
               ? 'border-slate-200 bg-slate-50/30 cursor-wait opacity-70'
@@ -237,7 +282,7 @@ export function ImportStatement() {
               <div className="w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-primary-100">
                 <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
               </div>
-              <p className="text-slate-600 font-semibold text-lg mb-1">Processando {fileName}...</p>
+              <p className="text-slate-600 font-semibold text-lg mb-1 [overflow-wrap:anywhere]">Processando {fileName}...</p>
               <p className="text-sm text-slate-400">Aguarde enquanto o arquivo é lido.</p>
             </>
           ) : (
@@ -247,7 +292,7 @@ export function ImportStatement() {
               }`}>
                 <Upload className={`w-8 h-8 ${isDragging ? 'text-primary-500' : 'text-slate-400'}`} />
               </div>
-              <p className="text-slate-600 font-semibold text-lg mb-1">
+              <p className="text-slate-600 font-semibold text-lg mb-1 [overflow-wrap:anywhere]">
                 {fileName ? `📄 ${fileName}` : 'Arraste o arquivo aqui'}
               </p>
               <p className="text-sm text-slate-400">
@@ -260,12 +305,41 @@ export function ImportStatement() {
 
       {/* Messages */}
       {error && (
-        <div className="animate-scale-in rounded-2xl p-4 mb-6 flex items-start gap-3"
-          style={{ background: 'linear-gradient(135deg, #fef2f2, #fee2e2)' }}>
+        <div
+          role="alert"
+          className="animate-scale-in rounded-2xl p-4 mb-6 flex items-start gap-3"
+          style={{ background: 'linear-gradient(135deg, #fef2f2, #fee2e2)' }}
+        >
           <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm font-medium text-red-700 flex-1">{error}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800 [overflow-wrap:anywhere]">
+              {fileName ? `Não foi possível importar ${fileName}` : 'Não foi possível importar'}
+            </p>
+            <p className="mt-1 text-sm text-red-700 [overflow-wrap:anywhere]">{error.message}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {error.needsBank ? (
+                <button
+                  type="button"
+                  onClick={() => setIsBankOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-white"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  Escolher banco
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-white"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Escolher outro arquivo
+                </button>
+              )}
+            </div>
+          </div>
           <button
-            onClick={() => setError('')}
+            onClick={() => setError(null)}
             title="Fechar mensagem de erro"
             aria-label="Fechar mensagem de erro"
             className="cursor-pointer hover:opacity-70 transition-opacity"
@@ -275,18 +349,65 @@ export function ImportStatement() {
         </div>
       )}
 
-      {success && (
-        <div className="animate-scale-in rounded-2xl p-4 mb-6 flex items-start gap-3"
-          style={{ background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)' }}>
-          <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm font-medium text-emerald-700 flex-1">{success}</p>
+      {importResult && (
+        <div
+          role="status"
+          className="animate-scale-in rounded-2xl p-4 mb-6 flex items-start gap-3"
+          style={{
+            background:
+              importResult.added.length > 0
+                ? 'linear-gradient(135deg, #ecfdf5, #d1fae5)'
+                : 'linear-gradient(135deg, #f8fafc, #eef2ff)',
+          }}
+        >
+          {importResult.added.length > 0 ? (
+            <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+          ) : (
+            <Info className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p
+              className={`text-sm font-medium ${
+                importResult.added.length > 0 ? 'text-emerald-700' : 'text-slate-700'
+              }`}
+            >
+              {describeImportResult(importResult)}
+            </p>
+            {importResult.skipped.length > 0 && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-800">
+                  {importResult.skipped.length === 1
+                    ? 'Ver a transação ignorada'
+                    : `Ver as ${importResult.skipped.length} transações ignoradas`}
+                </summary>
+                <p className="mt-2 text-xs text-slate-600">
+                  Já havia no app um lançamento com a mesma data, descrição, valor e banco.
+                </p>
+                <ul className="mt-2 max-h-60 divide-y divide-slate-200/70 overflow-y-auto rounded-xl bg-white/60 text-xs">
+                  {importResult.skipped.map(tx => (
+                    <li key={tx.id} className="flex items-baseline gap-3 px-3 py-2">
+                      <span className="shrink-0 tabular-nums text-slate-500">{formatDate(tx.date)}</span>
+                      <span className="min-w-0 flex-1 truncate text-slate-700">{tx.description}</span>
+                      <span
+                        className={`shrink-0 font-mono tabular-nums ${
+                          tx.amount >= 0 ? 'text-emerald-600' : 'text-red-500'
+                        }`}
+                      >
+                        {formatCurrency(tx.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
           <button
-            onClick={() => setSuccess('')}
-            title="Fechar mensagem de sucesso"
-            aria-label="Fechar mensagem de sucesso"
+            onClick={() => setImportResult(null)}
+            title="Fechar mensagem"
+            aria-label="Fechar mensagem"
             className="cursor-pointer hover:opacity-70 transition-opacity"
           >
-            <X className="w-4 h-4 text-emerald-400" />
+            <X className="w-4 h-4 text-slate-400" />
           </button>
         </div>
       )}

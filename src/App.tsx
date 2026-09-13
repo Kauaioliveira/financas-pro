@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
 import { FinanceProvider } from './context/FinanceContext';
+import { ImportDraftProvider } from './context/ImportDraftContext';
 import { AuthGate } from './components/auth/AuthGate';
 import { Sidebar } from './components/Sidebar';
 import type { TabType } from './types';
@@ -75,14 +76,16 @@ function SecureApp() {
 
   return (
     <FinanceProvider dataKey={getDataKey()!} userId={getUserId()!}>
-      <AppShell
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        tabTitle={tabTitles[activeTab]}
-        isResetOpen={isResetOpen}
-        setIsResetOpen={setIsResetOpen}
-        content={renderContent()}
-      />
+      <ImportDraftProvider>
+        <AppShell
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          tabTitle={tabTitles[activeTab]}
+          isResetOpen={isResetOpen}
+          setIsResetOpen={setIsResetOpen}
+          content={renderContent()}
+        />
+      </ImportDraftProvider>
     </FinanceProvider>
   );
 }
@@ -185,7 +188,7 @@ function AppShell({
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-cyan-200/55 light:text-cyan-700/70">
                 Central Financeira
               </p>
-              <h1 className="font-display text-2xl font-semibold text-[color:var(--app-fg-strong)] sm:text-3xl">
+              <h1 className="font-display text-xl font-semibold text-[color:var(--app-fg-strong)] sm:text-2xl">
                 {tabTitle}
               </h1>
               <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
@@ -282,7 +285,7 @@ function AppShell({
             className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
             onClick={() => setIsResetOpen(false)}
           />
-          <div className="dark-surface animate-scale-in relative w-full max-w-lg rounded-[28px] p-6 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
+          <div className="dark-surface animate-scale-in relative max-h-[calc(100dvh-3rem)] w-full max-w-lg overflow-y-auto rounded-[24px] p-6 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
             <div className="flex items-start gap-4">
               <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-rose-500/12 text-rose-300 ring-1 ring-inset ring-rose-400/18">
                 <AlertTriangle className="h-5 w-5" />
@@ -333,7 +336,7 @@ function AppShell({
 function ContentLoader({ label }: { label: string }) {
   return (
     <div className="flex h-full min-h-[320px] items-center justify-center p-8">
-      <div className="dark-surface rounded-[28px] px-6 py-6 text-center shadow-[0_26px_60px_rgba(0,0,0,0.32)]">
+      <div className="dark-surface rounded-[24px] px-6 py-6 text-center shadow-[0_26px_60px_rgba(0,0,0,0.32)]">
         <div
           className="mx-auto mb-4 h-12 w-12 animate-pulse rounded-2xl"
           style={{ background: 'linear-gradient(135deg, #22d3ee, #3b82f6)' }}
