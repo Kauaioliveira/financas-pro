@@ -202,7 +202,7 @@ export function SettingsModal({
         className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="dark-surface animate-scale-in relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[28px] p-6 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
+      <div className="dark-surface animate-scale-in relative max-h-[calc(100dvh-3rem)] w-full max-w-lg overflow-y-auto rounded-[24px] p-6 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-cyan-500/12 text-cyan-200 ring-1 ring-inset ring-cyan-400/18">
             <Settings className="h-5 w-5" />
@@ -277,7 +277,7 @@ export function SettingsModal({
                     <button
                       type="button"
                       onClick={() => setShowPw(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400"
                       tabIndex={-1}
                     >
                       {showPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -362,7 +362,7 @@ export function SettingsModal({
                           <button
                             type="button"
                             onClick={() => setShowExportPw(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400"
                             tabIndex={-1}
                           >
                             {showExportPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -493,7 +493,7 @@ export function SettingsModal({
                           <button
                             type="button"
                             onClick={() => setShowImportPw(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400"
                             tabIndex={-1}
                           >
                             {showImportPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}

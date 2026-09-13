@@ -206,13 +206,13 @@ export function Dashboard() {
       <div className="dashboard-shell p-4 sm:p-6">
         <section className="dashboard-hero animate-fade-in">
           <div className="relative z-10 mx-auto max-w-3xl text-center">
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[28px] bg-cyan-400/10 text-cyan-200 ring-1 ring-inset ring-cyan-300/20">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[24px] bg-cyan-400/10 text-cyan-200 ring-1 ring-inset ring-cyan-300/20">
               <Sparkles className="h-9 w-9" />
             </div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-cyan-200/55">
               Painel pronto
             </p>
-            <h2 className="font-display mt-4 text-2xl sm:text-4xl xl:text-5xl font-semibold text-white">
+            <h2 className="font-display mt-4 text-xl sm:text-3xl xl:text-4xl font-semibold text-white">
               O caixa esta vazio, mas a estrutura ja esta pronta.
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
@@ -244,7 +244,7 @@ export function Dashboard() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-cyan-200/55">
               Visao mensal
             </p>
-            <h2 className="font-display mt-2 sm:mt-3 text-2xl sm:text-4xl xl:text-5xl font-semibold text-white">
+            <h2 className="font-display mt-2 sm:mt-3 text-xl sm:text-3xl xl:text-4xl font-semibold text-white">
               {selectedMonth ? getMonthLabel(selectedMonth) : 'Sem periodo'}
             </h2>
             <p className="mt-2 sm:mt-4 max-w-2xl text-sm leading-6 sm:leading-7 text-slate-300 sm:text-base">
@@ -252,7 +252,7 @@ export function Dashboard() {
             </p>
           </div>
 
-          <div className="dark-surface-soft rounded-[20px] sm:rounded-[28px] p-4 sm:p-5">
+          <div className="dark-surface-soft rounded-[16px] sm:rounded-[24px] p-4 sm:p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
               Recorte
             </p>
@@ -363,7 +363,7 @@ export function Dashboard() {
         </SectionShell>
       </section>
 
-      <section className="dark-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-6">
+      <section className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-200/55">
@@ -412,7 +412,7 @@ export function Dashboard() {
         </div>
       </section>
 
-      <section className="dark-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-6">
+      <section className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-100">
             <Receipt className="h-5 w-5" />
@@ -430,7 +430,7 @@ export function Dashboard() {
         <div className="mt-5 grid gap-3">
           {snapshot?.invoicesToPay.length ? (
             snapshot.invoicesToPay.map(invoice => (
-              <div key={invoice.id} className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+              <div key={invoice.id} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-white">{invoice.cardName}</p>
@@ -443,7 +443,7 @@ export function Dashboard() {
               </div>
             ))
           ) : (
-            <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
+            <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
               Nenhuma fatura entra neste mes.
             </div>
           )}
@@ -473,7 +473,7 @@ function MetricCard({
           <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
             {label}
           </p>
-          <p className="mt-4 font-display text-3xl font-semibold text-cyan-100">{value}</p>
+          <p className="mt-4 font-display text-2xl font-semibold text-cyan-100">{value}</p>
         </div>
         <div
           className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-[0_16px_32px_rgba(15,23,42,0.26)]"
@@ -499,7 +499,7 @@ function SectionShell({
   children: ReactNode;
 }) {
   return (
-    <section className="dark-surface rounded-[28px] p-5 sm:p-6">
+    <section className="dark-surface rounded-[24px] p-5 sm:p-6">
       <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-200/55">
         {eyebrow}
       </p>
@@ -565,13 +565,13 @@ function ComparisonCard({
   const Icon = isFlat ? Wallet : isUp ? TrendingUp : TrendingDown;
 
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+    <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
             Ritmo do mes
           </p>
-          <p className={`mt-3 font-display text-3xl font-semibold ${tone}`}>
+          <p className={`mt-3 font-display text-2xl font-semibold ${tone}`}>
             {comparison ? formatCurrency(comparison.currentTotal) : formatCurrency(0)}
           </p>
         </div>
@@ -624,7 +624,7 @@ function BreakdownPanel({
   breakdown: ExpenseBreakdown;
 }) {
   return (
-    <article className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 sm:p-5">
+    <article className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-white">{title}</p>
@@ -697,7 +697,7 @@ function BreakdownList({
   emptyMessage: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/8 bg-slate-950/22 p-3">
+    <div className="rounded-[18px] border border-white/8 bg-slate-950/22 p-3">
       <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p>
       <div className="mt-3 space-y-2.5">
         {items.length ? (
@@ -754,7 +754,7 @@ function EmptyBreakdown({
   description: string;
 }) {
   return (
-    <div className="xl:col-span-2 rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-10 text-center">
+    <div className="xl:col-span-2 rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-10 text-center">
       <p className="text-sm font-semibold text-slate-200">{title}</p>
       <p className="mt-2 text-sm text-slate-400">{description}</p>
     </div>
@@ -769,7 +769,7 @@ function OnboardingCard({ onDismiss }: { onDismiss: () => void }) {
   ];
 
   return (
-    <section className="dark-surface animate-fade-in mt-4 rounded-[28px] p-5 sm:p-6">
+    <section className="dark-surface animate-fade-in mt-4 rounded-[24px] p-5 sm:p-6">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-200/55">

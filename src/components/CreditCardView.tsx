@@ -83,7 +83,7 @@ export function CreditCardView() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-cyan-200/55">
                 Modulo de cartao
               </p>
-              <h2 className="font-display mt-2 sm:mt-3 text-2xl sm:text-4xl xl:text-5xl font-semibold text-white">
+              <h2 className="font-display mt-2 sm:mt-3 text-xl sm:text-3xl xl:text-4xl font-semibold text-white">
                 Ciclo real da fatura
               </h2>
               <p className="mt-2 sm:mt-4 max-w-2xl text-sm leading-6 sm:leading-7 text-slate-300 sm:text-base">
@@ -120,7 +120,7 @@ export function CreditCardView() {
         />
       </section>
 
-      <section className="dark-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-6">
+      <section className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-200/55">
@@ -187,7 +187,7 @@ export function CreditCardView() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <div className="dark-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-6">
+        <div className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-200/55">
@@ -204,7 +204,7 @@ export function CreditCardView() {
               <EmptyBlock message="Nenhum cartao cadastrado ainda. Crie o primeiro para liberar a importacao de faturas." />
             ) : (
               cardAccounts.map(card => (
-                <div key={card.id} className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+                <div key={card.id} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <div
@@ -237,7 +237,7 @@ export function CreditCardView() {
           </div>
         </div>
 
-        <div className="dark-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-6">
+        <div className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-100">
               <CalendarClock className="h-5 w-5" />
@@ -259,7 +259,7 @@ export function CreditCardView() {
               cardInvoices.map(invoice => {
                 const expanded = expandedInvoice === invoice.id;
                 return (
-                  <div key={invoice.id} className="rounded-[24px] border border-white/8 bg-white/[0.03]">
+                  <div key={invoice.id} className="rounded-[20px] border border-white/8 bg-white/[0.03]">
                     <button
                       onClick={() => setExpandedInvoice(expanded ? null : invoice.id)}
                       className="w-full p-4 text-left"
@@ -326,7 +326,7 @@ export function CreditCardView() {
         </div>
       </section>
 
-      <section className="dark-surface rounded-[28px] p-5 sm:p-6">
+      <section className="dark-surface rounded-[24px] p-5 sm:p-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-100">
             <CheckCircle2 className="h-5 w-5" />
@@ -349,7 +349,7 @@ export function CreditCardView() {
               .filter(purchase => purchase.status !== 'paga')
               .slice(0, 12)
               .map(purchase => (
-                <div key={purchase.id} className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+                <div key={purchase.id} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-white">{purchase.description}</p>
@@ -405,7 +405,7 @@ function Metric({
           <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
             {label}
           </p>
-          <p className="mt-4 font-display text-3xl font-semibold text-cyan-100">{value}</p>
+          <p className="mt-4 font-display text-2xl font-semibold text-cyan-100">{value}</p>
           <p className="mt-3 text-sm leading-6 text-slate-400">{detail}</p>
         </div>
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-100">
@@ -426,9 +426,9 @@ function HighlightMetric({
   detail: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+    <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4">
       <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</p>
-      <p className="mt-3 font-display text-3xl font-semibold text-cyan-100">{value}</p>
+      <p className="mt-3 font-display text-2xl font-semibold text-cyan-100">{value}</p>
       <p className="mt-2 text-sm text-slate-400">{detail}</p>
     </div>
   );
@@ -436,7 +436,7 @@ function HighlightMetric({
 
 function EmptyBlock({ message }: { message: string }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
+    <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
       {message}
     </div>
   );
@@ -457,7 +457,7 @@ function BreakdownBlock({
   const barClass = tone === 'invoice' ? 'from-amber-300 to-rose-400' : 'from-cyan-300 to-blue-400';
 
   return (
-    <article className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4 sm:p-5">
+    <article className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-white">{title}</p>
@@ -530,7 +530,7 @@ function BreakdownList({
   barClass: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/8 bg-slate-950/22 p-3">
+    <div className="rounded-[18px] border border-white/8 bg-slate-950/22 p-3">
       <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p>
       <div className="mt-3 space-y-2.5">
         {items.length ? (

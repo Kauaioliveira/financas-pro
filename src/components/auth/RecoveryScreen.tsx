@@ -42,7 +42,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
   if (done) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4" style={{ background: 'var(--app-bg)' }}>
-        <div className="dark-surface w-full max-w-md rounded-[28px] p-6 sm:p-8 text-center">
+        <div className="dark-surface w-full max-w-md rounded-[24px] p-6 sm:p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/12 text-emerald-300">
             <KeyRound className="h-6 w-6" />
           </div>
@@ -68,7 +68,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
       <div className="w-full max-w-md">
         <form
           onSubmit={handleRecover}
-          className="dark-surface rounded-[28px] p-6 sm:p-8"
+          className="dark-surface rounded-[24px] p-6 sm:p-8"
         >
           <h2 className="text-lg font-semibold text-white">Recuperar conta</h2>
           <p className="mt-2 text-sm text-slate-400">
@@ -126,7 +126,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-200"
                 tabIndex={-1}
               >
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
