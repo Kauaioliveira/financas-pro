@@ -82,6 +82,9 @@ stateDiagram-v2
 | `FinanceContext.tsx` | Estado financeiro (transacoes, cartoes, faturas, regras), persistencia cifrada |
 | `FinanceContext.shared.ts` | Interface `FinanceContextType` compartilhada |
 | `useFinance.ts` | Hook de acesso ao contexto financeiro |
+| `ImportDraftContext.tsx` | Guarda em memória a pré-visualização de importação (extrato e fatura) ao trocar de aba; nunca grava em storage |
+| `ImportDraftContext.shared.ts` | Tipos `ImportDraft`, `CardImportDraft` e o contexto |
+| `useImportDraft.ts` | Hook de acesso ao rascunho de importação |
 
 ### Storage e backup (`src/utils/`)
 
@@ -89,9 +92,11 @@ stateDiagram-v2
 |---------|-----------------|
 | `secureStorage.ts` | Leitura/escrita cifrada no localStorage, namespaced por userId |
 | `backup.ts` | Export/import `.financas.enc`, validacao de schema com Zod |
-| `parser.ts` | Parsing de CSV, OFX, PDF de extratos bancarios |
-| `categorize.ts` | Categorizacao automatica por pattern matching |
-| `credit.ts` | Logica de faturas, vencimento, status |
+| `parser.ts` | Leitura de extratos (CSV, OFX, QFX; PDF de Neon e Banrisul) e de faturas de cartão (CSV e PDF, leitor genérico) |
+| `categorize.ts` | Categorização automática e tipo do lançamento (débito, PIX, transferência, crédito); detecção de pagamento de fatura |
+| `credit.ts` | Fatura de cada compra (ciclo), fechamento, vencimento, mês de pagamento e status |
+| `importMerge.ts` | Remoção de repetidos na importação (comparação por multiconjunto) para extrato e fatura |
+| `cardImport.ts` | Agrupamento da pré-visualização por fatura e mensagens de erro/resultado da importação de fatura |
 
 ### Componentes de autenticacao (`src/components/auth/`)
 
@@ -107,9 +112,10 @@ stateDiagram-v2
 | Arquivo | Responsabilidade |
 |---------|-----------------|
 | `Dashboard.tsx` | Visao analitica mensal com graficos e filtros |
-| `ImportStatement.tsx` | Fluxo de importacao de extratos e faturas |
+| `ImportStatement.tsx` | Importação de extrato bancário (aba Importar Extrato) |
+| `CardStatementImport.tsx` | Importação de fatura de cartão (aba Cartão de Crédito → Importar fatura) |
 | `TransactionList.tsx` | Lista de transacoes com edicao |
-| `CreditCardView.tsx` | Gestao de cartoes e faturas |
+| `CreditCardView.tsx` | Gestão de cartões e faturas; abre a importação de fatura |
 | `CategoryRules.tsx` | Regras de categorizacao automatica |
 | `SettingsModal.tsx` | Configuracoes: tema, senha, backup cifrado |
 | `Sidebar.tsx` | Navegacao lateral |
@@ -130,6 +136,8 @@ flowchart LR
     SafeData -->|setState| FinCtx2[FinanceContext]
   end
 ```
+
+Regras de cálculo (fatura no mês de vencimento, compras abertas, o que fica fora dos gastos) e de repetidos estão descritas para o usuário em [`IMPORTACAO-E-CALCULOS.md`](IMPORTACAO-E-CALCULOS.md).
 
 ## Decisoes de design
 
