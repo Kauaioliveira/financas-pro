@@ -12,6 +12,7 @@ import { useFinance } from './context/useFinance';
 import { SettingsModal } from './components/SettingsModal';
 import { VaultLoadErrorScreen } from './components/VaultLoadErrorScreen';
 import { SyncBadge } from './components/SyncBadge';
+import { SyncConflictDialog } from './components/SyncConflictDialog';
 import type { ThemePreference } from './components/SettingsModal';
 
 const THEME_KEY = 'financaspro_theme';
@@ -132,7 +133,15 @@ function AppShell({
   content: ReactNode;
 }) {
   const { clearAll, exportFinanceBackup, importFinanceBackup, saveError, retrySave } = useFinance();
-  const { signOut, getDisplayName, users, syncStatus } = useAuth();
+  const { signOut, getDisplayName, users, syncStatus, resolveSyncConflict, syncNow } = useAuth();
+  const [conflictDismissed, setConflictDismissed] = useState(false);
+  const inConflict = syncStatus?.state === 'conflict';
+  const [lastConflictState, setLastConflictState] = useState(inConflict);
+  if (inConflict !== lastConflictState) {
+    // A new conflict always shows the choice again.
+    setLastConflictState(inConflict);
+    if (inConflict) setConflictDismissed(false);
+  }
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
@@ -237,7 +246,12 @@ function AppShell({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              {__FINANCASPRO_CLOUD__ && syncStatus && <SyncBadge status={syncStatus} />}
+              {__FINANCASPRO_CLOUD__ && syncStatus && (
+                <SyncBadge
+                  status={syncStatus}
+                  onAction={() => (syncStatus.state === 'conflict' ? setConflictDismissed(false) : syncNow())}
+                />
+              )}
               <button
                 onClick={() => setIsSidebarOpen(true)}
                 className="shell-icon-button hover:text-cyan-100 lg:hidden"
@@ -334,6 +348,14 @@ function AppShell({
         exportData={exportFinanceBackup}
         importData={importFinanceBackup}
       />
+
+      {__FINANCASPRO_CLOUD__ && inConflict && !conflictDismissed && (
+        <SyncConflictDialog
+          message={syncStatus?.message ?? null}
+          onResolve={resolveSyncConflict}
+          onClose={() => setConflictDismissed(true)}
+        />
+      )}
 
       {isResetOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">

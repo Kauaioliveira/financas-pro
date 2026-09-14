@@ -48,6 +48,8 @@ export class MockSupabase {
   keyHistory: KeyHistoryEntry[] = [];
   vaultHistory: Array<{ id: number; user_id: string; version: number; keys_version: number; ciphertext: string; created_at: string }> = [];
   online = true;
+  /** Devices (browser contexts) without internet; the others keep working. */
+  offline = new Set<BrowserContext>();
   resetRequests: Array<{ email: string; redirectTo: string | null }> = [];
   unexpected: string[] = [];
   private seq = 1;
@@ -128,10 +130,10 @@ export class MockSupabase {
   }
 
   async install(context: BrowserContext): Promise<void> {
-    await context.route(`${MOCK_SUPABASE_URL}/**`, route => this.handle(route));
+    await context.route(`${MOCK_SUPABASE_URL}/**`, route => this.handle(route, context));
   }
 
-  private async handle(route: Route): Promise<void> {
+  private async handle(route: Route, context: BrowserContext): Promise<void> {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
@@ -150,7 +152,7 @@ export class MockSupabase {
         },
       });
     }
-    if (!this.online) return route.abort('internetdisconnected');
+    if (!this.online || this.offline.has(context)) return route.abort('internetdisconnected');
 
     const body = request.postData() ? JSON.parse(request.postData()!) : {};
 

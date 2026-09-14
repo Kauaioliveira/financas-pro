@@ -222,6 +222,35 @@ export function FinanceProvider({
 
   useEffect(() => saver.subscribe(status => setSaveError(saveErrorMessage(status))), [saver]);
 
+  // Cloud: newer data from another device reached this device. Apply it only when
+  // nothing here is waiting to be saved and nothing changed while it was read;
+  // otherwise the local edits are saved on their old base and the sync reports a
+  // conflict instead of anything being overwritten.
+  useEffect(() => {
+    if (!loaded || !store.subscribeRemote || !store.reloadRemote) return;
+    let active = true;
+    const unsubscribe = store.subscribeRemote(() => {
+      void (async () => {
+        await saver.flush();
+        if (!active || saver.getStatus().state !== 'idle') return;
+        const revision = saver.getRevision();
+        let remote: Awaited<ReturnType<NonNullable<VaultStore['reloadRemote']>>> = null;
+        try {
+          remote = await store.reloadRemote!();
+        } catch {
+          return; // unreadable: keep what is on screen; the sync already reported it
+        }
+        if (!active || !remote || saver.getRevision() !== revision) return;
+        remote.accept();
+        applyData(remote.data);
+      })();
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [loaded, store, saver, applyData]);
+
   // Persist vault data on changes (debounced). Only after a successful load.
   useEffect(() => {
     if (!loaded) return;

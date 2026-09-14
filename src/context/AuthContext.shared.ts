@@ -43,6 +43,10 @@ export interface AuthContextType {
   getDataKey: () => CryptoKey | null;
   getUserId: () => string | null;
   getDisplayName: () => string;
+  /** Cloud: the user's choice after a sync conflict. Local: no-op. */
+  resolveSyncConflict: (choice: 'use-remote' | 'keep-local') => Promise<void>;
+  /** Cloud: check the cloud and send pending edits now. Local: no-op. */
+  syncNow: () => void;
   /** Kit and backup information of the session, or null when locked. */
   getKeyInfo: () => KeyInfo | null;
   refreshUsers: () => Promise<void>;

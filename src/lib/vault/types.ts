@@ -22,4 +22,11 @@ export interface VaultStore {
    * (e.g. restoring a backup). Throws when the copy cannot be kept.
    */
   preserveUnreadable(): Promise<void>;
+  /** Cloud only: called when newer data from another device reached this device. */
+  subscribeRemote?(listener: () => void): () => void;
+  /**
+   * Cloud only: the latest data of this device when it has no pending local edits, or
+   * null. Nothing changes until accept() is called, which makes it the base of the next saves.
+   */
+  reloadRemote?(): Promise<{ data: VaultData; accept: () => void } | null>;
 }

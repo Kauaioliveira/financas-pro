@@ -8,6 +8,9 @@ import type {
   VaultRow,
 } from '../lib/cloud/backend';
 
+// Unique across servers: a sync timer left by one test must never match a user of another.
+let nextUserId = 1;
+
 interface FakeUser {
   id: string;
   email: string;
@@ -32,7 +35,6 @@ export class FakeCloudServer {
   allowlist: Set<string> | null = null;
   resetRequests: string[] = [];
   calls: string[] = [];
-  private nextId = 1;
   private clock = Date.parse('2026-09-14T12:00:00.000Z');
 
   tick(ms = 1_000): string {
@@ -71,7 +73,7 @@ export class FakeCloudServer {
 
   createUser(email: string, authSecret: string, displayName: string): FakeUser {
     const user: FakeUser = {
-      id: `00000000-0000-4000-8000-${String(this.nextId++).padStart(12, '0')}`,
+      id: `00000000-0000-4000-8000-${String(nextUserId++).padStart(12, '0')}`,
       email,
       authSecret,
       displayName,

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createCloudAuthProvider } from './cloudAuthProvider';
 import type { CloudAuthProvider } from './cloudAuthProvider';
 import { readCloudCache } from './vaultCache';
+import { decryptVault } from './vaultCrypto';
 import { FakeCloudServer } from '../../test/fakeCloudBackend';
 import type { FakeDevice } from '../../test/fakeCloudBackend';
 import { MemoryStorage } from '../../test/memoryStorage';
@@ -192,25 +193,33 @@ describe('cloud sign-in', () => {
   it('keeps unsent local edits when the password was changed on another device', async () => {
     const server = new FakeCloudServer();
     const { a, session } = await setUpAccount(server);
+    server.online = false; // the edit cannot be sent
     await a.provider.createVaultStore(session).save({ ...DATA, rules: [{ id: 'r-local' }] });
     await a.provider.signOut();
+    server.online = true;
 
     const b = device(server).use();
     unlocked(await b.provider.signIn({ email: EMAIL, password: PASSWORD }));
     const newPassword = 'pastel de vento na feira';
     await b.provider.changePassword(PASSWORD, newPassword);
+    await b.provider.signOut();
 
     // Old password still opens the cache offline-first, but the cloud refuses it.
     a.use();
     const stale = unlocked(await a.provider.signIn({ email: EMAIL, password: PASSWORD }));
     expect(a.provider.getSyncStatus()).toMatchObject({ state: 'blocked' });
     expect(a.provider.getSyncStatus().message).toMatch(/senha nova/);
+    expect(readCloudCache(stale.userId)).toMatchObject({ dirty: true, version: 0 });
     await a.provider.signOut();
 
     const fresh = unlocked(await a.provider.signIn({ email: EMAIL, password: newPassword }));
     expect(fresh.userId).toBe(stale.userId);
     expect(await a.provider.createVaultStore(fresh).load()).toEqual({ ...DATA, rules: [{ id: 'r-local' }] });
-    expect(readCloudCache(fresh.userId)).toMatchObject({ dirty: true, version: 0 });
+
+    await a.provider.syncNow();
+    expect(readCloudCache(fresh.userId)).toMatchObject({ dirty: false, version: 1 });
+    const row = server.vaults.get(fresh.userId)!;
+    expect(await decryptVault(fresh.dataKey, row.ciphertext)).toEqual({ ...DATA, rules: [{ id: 'r-local' }] });
   });
 
   it('keeps a corrupt cache aside and downloads again (edge)', async () => {

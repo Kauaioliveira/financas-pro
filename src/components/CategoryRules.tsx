@@ -32,8 +32,31 @@ const DEFAULT_RULES: Omit<CategoryRule, 'id'>[] = [
 export function CategoryRules() {
   const { reapplyCategories, rules: contextRules, setRules: saveContextRules } = useFinance();
   const [rules, setRules] = useState<CategoryRule[]>(() => contextRules);
+  // The saved rules this screen's copy started from. When they change elsewhere (e.g.
+  // synced from another device), follow them unless this screen has unsaved edits.
+  const [baseRules, setBaseRules] = useState<CategoryRule[]>(() => contextRules);
   const [savedMsg, setSavedMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const hasUnsavedEdits = rules !== baseRules;
+  const changedElsewhere = contextRules !== baseRules;
+
+  if (changedElsewhere && !hasUnsavedEdits) {
+    setBaseRules(contextRules);
+    setRules(contextRules);
+  }
+
+  function commitRules(next: CategoryRule[]) {
+    saveContextRules(next);
+    setRules(next);
+    setBaseRules(next);
+  }
+
+  function discardEdits() {
+    setRules(contextRules);
+    setBaseRules(contextRules);
+    setSavedMsg('');
+    setErrorMsg('');
+  }
 
   const hasInvalid = useMemo(
     () => rules.some(r => r.enabled && (!r.matchText.trim() || !r.category.trim())),
@@ -81,8 +104,7 @@ export function CategoryRules() {
       return;
     }
 
-    saveContextRules(cleaned);
-    setRules(cleaned);
+    commitRules(cleaned);
     setSavedMsg('Regras salvas no cofre.');
     setTimeout(() => setSavedMsg(''), 2500);
   }
@@ -101,8 +123,7 @@ export function CategoryRules() {
       .map(r => ({ ...r, id: newId() }));
 
     const merged = [...toAdd, ...existing];
-    saveContextRules(merged);
-    setRules(merged);
+    commitRules(merged);
     setSavedMsg(
       toAdd.length === 0
         ? 'As regras prontas já estavam cadastradas.'
@@ -126,8 +147,7 @@ export function CategoryRules() {
       return;
     }
 
-    saveContextRules(cleaned);
-    setRules(cleaned);
+    commitRules(cleaned);
     reapplyCategories();
     setSavedMsg('Regras salvas e aplicadas nas transações existentes.');
     setTimeout(() => setSavedMsg(''), 2500);
@@ -183,6 +203,24 @@ export function CategoryRules() {
           </button>
         </div>
       </div>
+
+      {changedElsewhere && hasUnsavedEdits && (
+        <div role="alert" className="animate-scale-in rounded-2xl p-4 mb-5 flex flex-col gap-3 sm:flex-row sm:items-center"
+          style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)' }}
+        >
+          <AlertTriangle className="hidden w-5 h-5 text-amber-600 sm:block" aria-hidden="true" />
+          <p className="flex-1 text-sm font-semibold text-amber-800">
+            As regras foram alteradas em outro aparelho. Salvar agora substitui essas alterações pelas desta tela.
+          </p>
+          <button
+            type="button"
+            onClick={discardEdits}
+            className="rounded-xl bg-white/70 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+          >
+            Descartar minhas mudanças e carregar
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="animate-scale-in rounded-2xl p-4 mb-5 flex items-start gap-3"
