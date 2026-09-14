@@ -2,6 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalAuthProvider } from './localAuthProvider';
 import type { AuthProvider } from './types';
 
+// See crypto.test.ts: envelopes store their iteration count, so a low count keeps
+// the same code paths without the PBKDF2 cost that made this file time out.
+vi.mock('../crypto/constants', async importOriginal => ({
+  ...(await importOriginal<typeof import('../crypto/constants')>()),
+  PBKDF2_ITERATIONS: 1_000,
+}));
+
 describe('localAuthProvider', () => {
   let provider: AuthProvider;
 

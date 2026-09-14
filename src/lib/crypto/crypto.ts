@@ -1,5 +1,7 @@
 import { PBKDF2_ITERATIONS, SALT_BYTES, IV_BYTES, KEY_BYTES, VAULT_VERSION } from './constants';
 import { getRandomBytes, toBase64, fromBase64, subtle } from './utils';
+import { compress, decompress } from './compression';
+import type { CompressionFormat } from './compression';
 
 export interface EncryptedPayload {
   v: number;
@@ -9,6 +11,8 @@ export interface EncryptedPayload {
   salt: string;
   iterations: number;
   ciphertext: string;
+  /** Present when the plaintext was compressed before encryption. Absent in payloads written before v2. */
+  z?: CompressionFormat;
 }
 
 export interface VaultEnvelope {
@@ -267,9 +271,11 @@ export async function recoverWithPhrase(
 export async function encryptData(
   dataKey: CryptoKey,
   plaintext: string,
+  options: { compress?: boolean } = {},
 ): Promise<string> {
   const encoded = new TextEncoder().encode(plaintext);
-  const { ciphertext, iv } = await aesGcmEncrypt(dataKey, encoded);
+  const body = options.compress ? await compress(encoded) : encoded;
+  const { ciphertext, iv } = await aesGcmEncrypt(dataKey, body);
   const payload: EncryptedPayload = {
     v: VAULT_VERSION,
     alg: 'AES-GCM',
@@ -279,6 +285,7 @@ export async function encryptData(
     iterations: 0,
     ciphertext: toBase64(ciphertext),
   };
+  if (options.compress) payload.z = 'gzip';
   return JSON.stringify(payload);
 }
 
@@ -288,12 +295,16 @@ export async function decryptData(
 ): Promise<string> {
   const payload: EncryptedPayload = JSON.parse(encrypted);
   if (payload.alg !== 'AES-GCM') throw new Error('Algoritmo não suportado');
+  if (payload.z !== undefined && payload.z !== 'gzip') {
+    throw new Error('Compressão não suportada');
+  }
   const plainBytes = await aesGcmDecrypt(
     dataKey,
     fromBase64(payload.ciphertext),
     fromBase64(payload.iv),
   );
-  return new TextDecoder().decode(plainBytes);
+  const body = payload.z === 'gzip' ? await decompress(plainBytes) : plainBytes;
+  return new TextDecoder().decode(body);
 }
 
 // --- Encrypt/decrypt for backup file (password-based, standalone) ---

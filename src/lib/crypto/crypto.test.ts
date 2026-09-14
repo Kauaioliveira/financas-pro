@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createVaultEnvelope,
   unlockVault,
@@ -11,6 +11,16 @@ import {
   decryptBackup,
 } from './crypto';
 import type { EncryptedPayload } from './crypto';
+import legacyFixture from '../../test/fixtures/legacy-v1.json';
+
+// PBKDF2 at the production count makes this file time out on slow machines.
+// Every envelope stores its own iteration count, so a lower count exercises
+// exactly the same code paths. Production values are asserted in accountKeys.test.ts
+// and the real 310k format is covered by the legacy fixture in legacyCompat.test.ts.
+vi.mock('./constants', async importOriginal => ({
+  ...(await importOriginal<typeof import('./constants')>()),
+  PBKDF2_ITERATIONS: 1_000,
+}));
 
 const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -60,6 +70,41 @@ describe('encryptData / decryptData', () => {
     const payload: EncryptedPayload = JSON.parse(encrypted);
     payload.ciphertext = tamperBase64(payload.ciphertext);
     await expect(decryptData(dataKey, JSON.stringify(payload))).rejects.toThrow();
+  });
+});
+
+describe('encryptData with gzip (z field)', () => {
+  it('round-trips compressed plaintext and marks the payload with z: gzip', async () => {
+    const { dataKey } = await createVaultEnvelope('senha123456');
+    const plaintext = JSON.stringify({ descrição: 'Açougue', list: Array(200).fill('Mercado') });
+    const encrypted = await encryptData(dataKey, plaintext, { compress: true });
+    const payload: EncryptedPayload = JSON.parse(encrypted);
+    expect(payload.z).toBe('gzip');
+    expect(await decryptData(dataKey, encrypted)).toBe(plaintext);
+  });
+
+  it('omits z when compression is not requested (same shape as before)', async () => {
+    const { dataKey } = await createVaultEnvelope('senha123456');
+    const payload: EncryptedPayload = JSON.parse(await encryptData(dataKey, 'texto'));
+    expect('z' in payload).toBe(false);
+  });
+
+  it('still decrypts a payload written before the z field existed', async () => {
+    const { unlockVault: unlock } = await import('./crypto');
+    const dataKey = await unlock(legacyFixture.password, legacyFixture.account.envelope);
+    expect('z' in JSON.parse(legacyFixture.vaultCiphertext)).toBe(false);
+    expect(JSON.parse(await decryptData(dataKey, legacyFixture.vaultCiphertext))).toEqual(
+      legacyFixture.expectedVault,
+    );
+  }, 30_000);
+
+  it('rejects an unknown compression marker', async () => {
+    const { dataKey } = await createVaultEnvelope('senha123456');
+    const payload = JSON.parse(await encryptData(dataKey, 'texto'));
+    payload.z = 'brotli';
+    await expect(decryptData(dataKey, JSON.stringify(payload))).rejects.toThrow(
+      'Compressão não suportada',
+    );
   });
 });
 

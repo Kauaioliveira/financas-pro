@@ -1,0 +1,57 @@
+{
+  "description": "Generated with the code at commit 27dd505 (PBKDF2 310k, VAULT_VERSION 1). Do not regenerate: it guards backward compatibility.",
+  "password": "senhaLegada1",
+  "phrase": "abacate cofre brisa forte janela lago milho navio pedra raiz selva tigre",
+  "backupPassword": "backup1",
+  "account": {
+    "id": "legacy0000000000000000aa",
+    "displayName": "Conta Legada",
+    "createdAt": "2026-09-14T12:00:00.000Z",
+    "envelope": {
+      "v": 1,
+      "salt": "CoWPtJzuV8npSWPIpDU22WmG8a54ubvzvCO9qxqn1cI=",
+      "iterations": 310000,
+      "verifier": "IclqVsZ4/ROYhTZeCdOrHIPNcN2Ii9p3UDyyF4Jnznk=",
+      "wrappedDataKey": "jny6Qv0+Fu+hQAf4qDHqCOga390EbEcIzw7MJpTavqmGTZTPZUYw2a9iuy7y+et2",
+      "wrappedDataKeyIv": "fuhzy46XuTYcqeV6",
+      "recoveryWrap": "cVycTPDqVebn2Q5kobNXzoeCEbyHSO5b5ltKwWxk658zle/LlJTqA5dw2OJEi8Ud",
+      "recoveryWrapIv": "x0X5Qhl8JIgROCHG",
+      "recoverySalt": "iY24tev/b9LeRHIxNDs8l1lk/0CbC0V2VvbFavtpJNQ="
+    }
+  },
+  "vaultCiphertext": "{\"v\":1,\"alg\":\"AES-GCM\",\"kdf\":\"PBKDF2\",\"iv\":\"aNqrkiTAN/MVF9RM\",\"salt\":\"\",\"iterations\":0,\"ciphertext\":\"Q7zFoJqLXCqPfYMNKR2i3TSsxDHigKQKC9csceENz1ogwS/h4wS/BOV5cnAS+VNOmhEh0uhqblBVwgRQyz8DFATFlMD2C0+voRPAYpEcFAWGpKw49Ca/rYY3Ff38MigWarZ0oCtB4686bw5G1l5DkkiuykCVL59kcNvMOE0U6Y/+JuvzpG9iDOVtHx6x2HsNOhEy07k9bwqMe7oKg6wZme9THh436Mk7Il4YRgPBDIyxEMN2cKcYrSmScvpx4JSBjVh41SIRDzKcAxIf+Oo=\"}",
+  "expectedVault": {
+    "transactions": [
+      {
+        "id": "t1",
+        "date": "2026-08-01",
+        "description": "Mercado",
+        "amount": -123.45,
+        "type": "debito",
+        "category": "Alimentação"
+      }
+    ],
+    "cards": [],
+    "card_purchases": [],
+    "invoices": [],
+    "rules": []
+  },
+  "backupV1": "{\"v\":1,\"alg\":\"AES-GCM\",\"kdf\":\"PBKDF2\",\"iv\":\"5MDNcBxi54S4KvLQ\",\"salt\":\"j55lE2YOsLvpgU4j6gHGDKxX1mLkwexucBNjG8DXuT0=\",\"iterations\":310000,\"ciphertext\":\"EfUUoA8xpmQcAS7i8GF6aWc1/KHo7xF6YqoWWRWFhn9KxGqvQgdxmROEuFrESoun0Mo6fggrUL7TjoBry04IdO+UviUgwKZw+482SlxVr3x4v0NvjfLXwK6tVDYVYRKOfzILzN3mXQnqSLnrpVTCw3/kksQQ6ar8V+1jB/m8p1zBqCQ4Zq/tpXab8gwnXTIZfL5NGDilF3cgWA7Jv1iw8MU5aZAtp3jEpsX7k55Xh7ufptggk2Y6MRln9vnCJXhpzOWlHY5RD9sOtAP7fS8Fc5utcD0vQ8Ki8nNk8KHZdTdPkndlWQ4nwq0Wiu4U/G6SM3nPewA=\"}",
+  "expectedBackup": {
+    "transactions": [
+      {
+        "id": "t1",
+        "date": "2026-08-01",
+        "description": "Mercado",
+        "amount": -123.45,
+        "type": "debito",
+        "category": "Alimentação"
+      }
+    ],
+    "cards": [],
+    "cardPurchases": [],
+    "invoices": [],
+    "rules": [],
+    "exportDate": "2026-09-14T12:00:00.000Z"
+  }
+}
