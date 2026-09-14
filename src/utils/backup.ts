@@ -3,8 +3,7 @@ import {
   decryptBackup,
   decryptData,
   encryptData,
-  normalizeKitWord,
-  normalizePhrase,
+  normalizeKitPhrase,
   unlockRecoveryWrap,
   unlockVault,
 } from '../lib/crypto';
@@ -133,6 +132,39 @@ export function detectBackupFormat(content: string): BackupFileFormat {
   return 'plain';
 }
 
+/** Key wraps written into a backup v2 file. At least one must be present. */
+export interface BackupWraps {
+  kit: BackupV2File['wraps']['kit'];
+  password: BackupV2File['wraps']['password'];
+}
+
+/** Wraps of a local account: its recovery kit (when it has one) and its password. */
+export function backupWrapsFromEnvelope(envelope: VaultEnvelope): BackupWraps {
+  const hasKit = Boolean(envelope.recoveryWrap && envelope.recoveryWrapIv && envelope.recoverySalt);
+  return {
+    kit: hasKit
+      ? {
+          kdf: LOCAL_WRAP_KDF,
+          id: envelope.kitId ?? null,
+          createdAt: envelope.kitCreatedAt ?? null,
+          salt: envelope.recoverySalt!,
+          // Kits without a recorded count used the legacy count; the file is always self-describing.
+          iterations: envelope.recoveryIterations ?? LEGACY_KIT_ITERATIONS,
+          iv: envelope.recoveryWrapIv!,
+          wrapped: envelope.recoveryWrap!,
+        }
+      : null,
+    password: {
+      kdf: LOCAL_WRAP_KDF,
+      salt: envelope.salt,
+      iterations: envelope.iterations,
+      verifier: envelope.verifier,
+      iv: envelope.wrappedDataKeyIv,
+      wrapped: envelope.wrappedDataKey,
+    },
+  };
+}
+
 /**
  * Backup v2: the data encrypted with the account data key (gzip) plus the key
  * wraps of the moment of export. Opens with that kit or that account password;
@@ -141,40 +173,17 @@ export function detectBackupFormat(content: string): BackupFileFormat {
 export async function exportBackupV2(
   plainJson: string,
   dataKey: CryptoKey,
-  envelope: VaultEnvelope,
+  wraps: BackupWraps,
   now: Date = new Date(),
 ): Promise<string> {
   validateBackupSchema(JSON.parse(plainJson));
 
   const payload = JSON.parse(await encryptData(dataKey, plainJson, { compress: true }));
-  const hasKit = Boolean(envelope.recoveryWrap && envelope.recoveryWrapIv && envelope.recoverySalt);
-
   const file: BackupV2File = {
     format: BACKUP_FORMAT,
     v: 2,
     createdAt: now.toISOString(),
-    wraps: {
-      kit: hasKit
-        ? {
-            kdf: LOCAL_WRAP_KDF,
-            id: envelope.kitId ?? null,
-            createdAt: envelope.kitCreatedAt ?? null,
-            salt: envelope.recoverySalt!,
-            // Kits without a recorded count used the legacy count; the file is always self-describing.
-            iterations: envelope.recoveryIterations ?? LEGACY_KIT_ITERATIONS,
-            iv: envelope.recoveryWrapIv!,
-            wrapped: envelope.recoveryWrap!,
-          }
-        : null,
-      password: {
-        kdf: LOCAL_WRAP_KDF,
-        salt: envelope.salt,
-        iterations: envelope.iterations,
-        verifier: envelope.verifier,
-        iv: envelope.wrappedDataKeyIv,
-        wrapped: envelope.wrappedDataKey,
-      },
-    },
+    wraps: { kit: wraps.kit, password: wraps.password },
     payload,
   };
 
@@ -183,6 +192,17 @@ export async function exportBackupV2(
   if (!check.success) throw new Error('Não foi possível montar o backup.');
 
   return JSON.stringify(file);
+}
+
+/** Converts restored backup data to the shape stored in the vault. */
+export function backupToVaultData(data: BackupData): Record<string, unknown> {
+  return {
+    transactions: data.transactions,
+    cards: data.cards,
+    card_purchases: data.cardPurchases,
+    invoices: data.invoices,
+    rules: data.rules,
+  };
 }
 
 export function readBackupV2Info(content: string): BackupV2Info {
@@ -194,10 +214,6 @@ export function readBackupV2Info(content: string): BackupV2Info {
     opensWithKit: file.wraps.kit !== null,
     opensWithPassword: file.wraps.password !== null,
   };
-}
-
-function normalizeKitPhrase(phrase: string): string {
-  return normalizePhrase(phrase).split(' ').map(normalizeKitWord).join(' ');
 }
 
 export async function importBackupV2(

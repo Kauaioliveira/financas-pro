@@ -18,11 +18,12 @@ export {
   KIT_CONFIRMATION_COUNT,
   computeKitId,
   findWrongConfirmationWords,
+  normalizeKitPhrase,
   normalizeKitWord,
   pickConfirmationPositions,
   splitPhrase,
 } from './kit';
-export { deriveAccountKeys, wrapKeyWith, unwrapKeyWith } from './accountKeys';
+export { deriveAccountKeys, normalizeEmail, wrapKeyWith, unwrapKeyWith } from './accountKeys';
 export type { AccountKeys, WrappedKey } from './accountKeys';
 export { compress, decompress } from './compression';
 export { generateRecoveryPhrase, normalizePhrase } from './wordlist';

@@ -1,10 +1,12 @@
 import { addRecoveryWrap, generateRecoveryPhrase, normalizePhrase, recoverWithPhrase } from '../crypto';
 import { createLocalVaultStore } from '../vault';
+import { backupWrapsFromEnvelope } from '../../utils/backup';
 import { createLocalAuthProvider } from './localAuthProvider';
 import type {
   AuthProvider,
   AuthProviderV2,
   AuthSession,
+  KeyInfo,
   KitRenewal,
   RecoverWithKitInput,
   RegisterInput,
@@ -14,13 +16,21 @@ import type {
   UserAccount,
 } from './types';
 
+export const LOCAL_PASSWORD_MIN_LENGTH = 6;
+
+/** Local sign-in always unlocks or throws. */
+export type LocalAuthProviderV2 = Omit<AuthProviderV2, 'mode' | 'signIn'> & {
+  readonly mode: 'local';
+  signIn(input: SignInInput): Promise<Extract<SignInResult, { status: 'unlocked' }>>;
+};
+
 /**
  * AuthProviderV2 for accounts stored in this browser. Delegates to the
  * synchronous local provider, so storage format and messages stay the same.
  */
 export function createLocalAuthProviderV2(
   base: AuthProvider = createLocalAuthProvider(),
-): AuthProviderV2 {
+): LocalAuthProviderV2 {
   let current: AuthSession | null = null;
 
   function requireSession(): AuthSession {
@@ -35,6 +45,33 @@ export function createLocalAuthProviderV2(
 
   return {
     mode: 'local',
+
+    validatePassword(password: string): string | null {
+      return password.length < LOCAL_PASSWORD_MIN_LENGTH
+        ? `A senha deve ter pelo menos ${LOCAL_PASSWORD_MIN_LENGTH} caracteres.`
+        : null;
+    },
+
+    async lock(): Promise<void> {
+      current = null;
+      base.signOut();
+    },
+
+    describeKeys(session: AuthSession): KeyInfo | null {
+      const envelope = base.getEnvelope(session.userId);
+      if (!envelope) return null;
+      return {
+        kitId: envelope.kitId ?? null,
+        kitCreatedAt: envelope.kitCreatedAt ?? null,
+        hasKit: Boolean(envelope.recoveryWrap),
+        backupWraps: backupWrapsFromEnvelope(envelope),
+      };
+    },
+
+    keysFingerprint(userId: string): string | null {
+      const envelope = base.getEnvelope(userId);
+      return envelope ? JSON.stringify(envelope) : null;
+    },
 
     async listLocalAccounts(): Promise<UserAccount[]> {
       return base.listUsers();
@@ -59,10 +96,10 @@ export function createLocalAuthProviderV2(
       };
     },
 
-    async signIn(input: SignInInput): Promise<SignInResult> {
+    async signIn(input: SignInInput) {
       const session = await base.signIn(requireUserId(input), input.password);
       current = session;
-      return { status: 'unlocked', session };
+      return { status: 'unlocked' as const, session };
     },
 
     async signOut(): Promise<void> {

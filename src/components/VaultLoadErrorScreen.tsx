@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, LogOut, RefreshCw, Upload } from 'lucide-react';
 import type { VaultLoadErrorActions } from '../context/FinanceContext';
-import { BackupSettings } from './BackupSettings';
+import { BackupImport } from './BackupImport';
 
 const CTA_GRADIENT = 'linear-gradient(135deg, #22d3ee, #3b82f6)';
 const FOCUS_RING =
@@ -70,7 +70,7 @@ export function VaultLoadErrorScreen({
               Antes de restaurar, uma cópia dos dados que não abrem fica guardada neste navegador. Se não houver
               espaço para a cópia, nada é alterado.
             </p>
-            <BackupSettings importData={restoreBackup} />
+            <BackupImport onImport={restoreBackup} />
           </div>
         )}
       </div>

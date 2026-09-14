@@ -10,9 +10,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:cloud": "playwright test -c playwright.cloud.config.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.116.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.8.0",
     "papaparse": "^5.5.3",

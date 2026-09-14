@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalAuthProviderV2 } from './localAuthProviderV2';
+import type { LocalAuthProviderV2 } from './localAuthProviderV2';
 import { createAuthProvider } from './createAuthProvider';
-import type { AuthProviderV2 } from './types';
 import { recoverWithPhrase } from '../crypto';
 
 vi.mock('../crypto/constants', async importOriginal => ({
@@ -16,7 +16,7 @@ describe('createAuthProvider', () => {
 });
 
 describe('localAuthProviderV2', () => {
-  let provider: AuthProviderV2;
+  let provider: LocalAuthProviderV2;
 
   beforeEach(() => {
     localStorage.clear();
@@ -142,6 +142,22 @@ describe('localAuthProviderV2', () => {
     )).filter(key => key.includes('_vault_unreadable_'));
     expect(copies).toHaveLength(1);
     expect(localStorage.getItem(copies[0])).toBe('{"garbage":true}');
+  });
+
+  it('describes the keys for settings and backups, and fingerprints them', async () => {
+    const { session, kit } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
+    const info = provider.describeKeys(session)!;
+    expect(info).toMatchObject({ kitId: kit.kitId, kitCreatedAt: kit.kitCreatedAt, hasKit: true });
+    expect(info.backupWraps?.kit?.id).toBe(kit.kitId);
+    expect(info.backupWraps?.password).not.toBeNull();
+
+    const before = provider.keysFingerprint(session.userId);
+    await provider.signIn({ userId: session.userId, password: 'senha123' });
+    await provider.changePassword('senha123', 'outraSenha1');
+    expect(provider.keysFingerprint(session.userId)).not.toBe(before);
+    expect(provider.keysFingerprint('nobody')).toBeNull();
+    expect(provider.validatePassword('12345')).toMatch(/6 caracteres/);
+    expect(provider.validatePassword('123456')).toBeNull();
   });
 
   it('deletes a local account with the right password', async () => {

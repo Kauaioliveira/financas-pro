@@ -24,7 +24,7 @@ export function SettingsModal({
   exportData?: () => string;
   importData?: (json: string) => void;
 }) {
-  const { changePassword } = useAuth();
+  const { changePassword, provider, mode } = useAuth();
 
   const [pwSection, setPwSection] = useState(false);
   const [oldPw, setOldPw] = useState('');
@@ -65,7 +65,8 @@ export function SettingsModal({
     setPwErr('');
     setPwMsg('');
     if (!oldPw) { setPwErr('Digite a senha atual.'); return; }
-    if (newPw.length < 6) { setPwErr('A nova senha deve ter pelo menos 6 caracteres.'); return; }
+    const rule = provider.validatePassword(newPw);
+    if (rule) { setPwErr(rule.replace('A senha', 'A nova senha')); return; }
     if (newPw !== confirmPw) { setPwErr('As senhas nao conferem.'); return; }
 
     setPwLoading(true);
@@ -176,7 +177,7 @@ export function SettingsModal({
                     type={showPw ? 'text' : 'password'}
                     value={newPw}
                     onChange={e => { setNewPw(e.target.value); setPwErr(''); }}
-                    placeholder="Nova senha (minimo 6)"
+                    placeholder={mode === 'cloud' ? 'Nova senha (mínimo 12)' : 'Nova senha (minimo 6)'}
                     className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-200/40"
                   />
                   <input

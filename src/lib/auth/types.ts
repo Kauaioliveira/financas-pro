@@ -1,5 +1,6 @@
 import type { VaultEnvelope } from '../crypto';
 import type { VaultStore } from '../vault';
+import type { BackupWraps } from '../../utils/backup';
 
 export interface UserAccount {
   id: string;
@@ -69,8 +70,33 @@ export interface SignInInput {
   password: string;
 }
 
-// Cloud mode will add results such as "needs-kit" and "needs-vault-setup".
-export type SignInResult = { status: 'unlocked'; session: AuthSession };
+export type SignInResult =
+  | { status: 'unlocked'; session: AuthSession }
+  /** Cloud: signed in, but the account has no vault yet. */
+  | { status: 'needs-vault-setup'; email: string }
+  /** Cloud: signed in, but the password does not open the data (it was reset by e-mail). */
+  | { status: 'needs-kit'; email: string }
+  /** Cloud: the e-mail was not confirmed yet. */
+  | { status: 'needs-email-confirmation'; email: string };
+
+/** What the settings screens show about the keys of the session. Never secret. */
+export interface KeyInfo {
+  kitId: string | null;
+  kitCreatedAt: string | null;
+  hasKit: boolean;
+  /** Wraps written into exported backups, or null when a backup cannot be opened later. */
+  backupWraps: BackupWraps | null;
+}
+
+/** Cloud sync state shown in the header. Local accounts have none. */
+export type SyncState = 'synced' | 'pending' | 'syncing' | 'offline' | 'conflict' | 'blocked' | 'error';
+
+export interface SyncStatus {
+  state: SyncState;
+  /** Explanation for the user when the state needs attention. */
+  message: string | null;
+  lastSyncedAt: string | null;
+}
 
 export interface RecoverWithKitInput {
   userId?: string;
@@ -81,10 +107,26 @@ export interface RecoverWithKitInput {
 
 export interface AuthProviderV2 {
   readonly mode: AuthMode;
+  /** Message in Portuguese when a new password is not acceptable in this mode, or null. */
+  validatePassword(password: string, context?: { email?: string }): string | null;
+  /** Drops the keys from memory. Cloud keeps the login session so the password reopens it. */
+  lock(): Promise<void>;
+  /** Kit and backup information of the session, read synchronously for rendering. */
+  describeKeys(session: AuthSession): KeyInfo | null;
+  /**
+   * Changes whenever the stored keys of the account change (kit renewal, password change),
+   * including from another tab. Null when the account is not stored on this device.
+   */
+  keysFingerprint(userId: string): string | null;
+  /** Cloud only. */
+  getSyncStatus?(): SyncStatus;
+  /** Cloud only. Returns the unsubscribe function. */
+  subscribeSync?(listener: (status: SyncStatus) => void): () => void;
   /** Accounts known on this device (cloud: cached accounts). */
   listLocalAccounts(): Promise<UserAccount[]>;
   register(input: RegisterInput): Promise<RegisterResult>;
   signIn(input: SignInInput): Promise<SignInResult>;
+  /** Ends the session (cloud: also the login session in this browser). */
   signOut(): Promise<void>;
   /** Requires a session. Returns the refreshed session. */
   changePassword(oldPassword: string, newPassword: string): Promise<AuthSession>;

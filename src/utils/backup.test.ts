@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   detectBackupFormat,
+  backupWrapsFromEnvelope,
+  backupToVaultData,
   exportBackupV2,
   importBackupV2,
   importEncryptedBackup,
@@ -42,29 +44,29 @@ async function accountWithKit() {
 describe('backup v2', () => {
   it('opens with the recovery kit', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     expect(await importBackupV2(file, { kind: 'kit', phrase: PHRASE })).toEqual(DATA);
   });
 
   it('records the kit iteration count of the account in the file', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, envelope));
+    const file = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope)));
     expect(file.wraps.kit.iterations).toBe(envelope.recoveryIterations);
     const { recoveryIterations: _ignored, ...oldEnvelope } = envelope;
     void _ignored;
-    const oldFile = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, oldEnvelope));
+    const oldFile = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(oldEnvelope)));
     expect(oldFile.wraps.kit.iterations).toBe(310_000);
   });
 
   it('opens with the account password', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     expect(await importBackupV2(file, { kind: 'password', password: 'senhaDaConta' })).toEqual(DATA);
   });
 
   it('accepts the kit typed with capitals, extra spaces and accents', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     const typed = `  ${PHRASE.toUpperCase().replace('LAGO', 'LÁGO').split(' ').join('   ')}\n`;
     expect(typed).toContain('LÁGO');
     expect(await importBackupV2(file, { kind: 'kit', phrase: typed })).toEqual(DATA);
@@ -72,7 +74,7 @@ describe('backup v2', () => {
 
   it('fails with a wrong kit', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     await expect(
       importBackupV2(file, { kind: 'kit', phrase: PHRASE.replace('tigre', 'urso') }),
     ).rejects.toThrow('Kit de recuperação incorreto para este backup.');
@@ -80,7 +82,7 @@ describe('backup v2', () => {
 
   it('fails with a wrong password', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     await expect(
       importBackupV2(file, { kind: 'password', password: 'outraSenha' }),
     ).rejects.toThrow('Senha incorreta para este backup.');
@@ -88,7 +90,7 @@ describe('backup v2', () => {
 
   it('rejects empty credentials without deriving anything', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     await expect(importBackupV2(file, { kind: 'kit', phrase: '   ' })).rejects.toThrow(
       'Digite as 12 palavras do kit.',
     );
@@ -100,7 +102,7 @@ describe('backup v2', () => {
   it('writes a gzip payload, the kit id and no secret material in clear', async () => {
     const { envelope, dataKey } = await accountWithKit();
     const now = new Date('2026-09-14T15:00:00.000Z');
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope, now);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope), now);
     const parsed = JSON.parse(file);
 
     expect(parsed.format).toBe('financaspro-backup');
@@ -119,7 +121,7 @@ describe('backup v2', () => {
 
   it('keeps opening with the kit and password of its time after the kit is renewed', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const oldBackup = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const oldBackup = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
 
     const newPhrase = 'barco canal delta erva farol gelo hora ilha jato lousa manta norte';
     const newKey = await generateDataKeyAsync();
@@ -135,16 +137,34 @@ describe('backup v2', () => {
       importBackupV2(oldBackup, { kind: 'kit', phrase: newPhrase }),
     ).rejects.toThrow('Kit de recuperação incorreto');
 
-    const newBackup = await exportBackupV2(JSON.stringify(DATA), newKey, renewed.envelope);
+    const newBackup = await exportBackupV2(JSON.stringify(DATA), newKey, backupWrapsFromEnvelope(renewed.envelope));
     await expect(importBackupV2(newBackup, { kind: 'kit', phrase: PHRASE })).rejects.toThrow(
       'Kit de recuperação incorreto',
     );
     expect(await importBackupV2(newBackup, { kind: 'kit', phrase: newPhrase })).toEqual(DATA);
   });
 
+  it('exports kit-only wraps (cloud accounts) and converts restored data to the vault shape', async () => {
+    const { envelope, dataKey } = await accountWithKit();
+    const wraps = { ...backupWrapsFromEnvelope(envelope), password: null };
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, wraps);
+    expect(readBackupV2Info(file)).toMatchObject({ opensWithKit: true, opensWithPassword: false });
+    const restored = await importBackupV2(file, { kind: 'kit', phrase: PHRASE });
+    expect(backupToVaultData(restored)).toEqual({
+      transactions: DATA.transactions,
+      cards: DATA.cards,
+      card_purchases: DATA.cardPurchases,
+      invoices: DATA.invoices,
+      rules: DATA.rules,
+    });
+    await expect(exportBackupV2(JSON.stringify(DATA), dataKey, { kit: null, password: null })).rejects.toThrow(
+      'Não foi possível montar o backup.',
+    );
+  });
+
   it('exports an account without a kit as password-only', async () => {
     const { envelope, dataKey } = await createVaultEnvelope('senhaDaConta');
-    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
+    const file = await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope));
     expect(readBackupV2Info(file).opensWithKit).toBe(false);
     await expect(importBackupV2(file, { kind: 'kit', phrase: PHRASE })).rejects.toThrow(
       'Este backup não tem kit de recuperação. Use a senha da conta.',
@@ -154,9 +174,9 @@ describe('backup v2', () => {
 
   it('reports a corrupted payload', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const parsed = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, envelope));
+    const parsed = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope)));
     const other = JSON.parse(
-      await exportBackupV2(JSON.stringify(DATA), await generateDataKeyAsync(), envelope),
+      await exportBackupV2(JSON.stringify(DATA), await generateDataKeyAsync(), backupWrapsFromEnvelope(envelope)),
     );
     parsed.payload = other.payload;
     await expect(
@@ -166,7 +186,7 @@ describe('backup v2', () => {
 
   it('rejects a malformed container with a Zod message', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    const parsed = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, envelope));
+    const parsed = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope)));
     parsed.wraps = { kit: null, password: null };
     expect(() => readBackupV2Info(JSON.stringify(parsed))).toThrow(/Arquivo de backup inválido/);
 
@@ -179,7 +199,7 @@ describe('backup v2', () => {
   it('refuses to export data that does not match the backup schema', async () => {
     const { envelope, dataKey } = await accountWithKit();
     await expect(
-      exportBackupV2(JSON.stringify({ transactions: 'não é lista' }), dataKey, envelope),
+      exportBackupV2(JSON.stringify({ transactions: 'não é lista' }), dataKey, backupWrapsFromEnvelope(envelope)),
     ).rejects.toThrow(/Arquivo de backup inválido/);
   });
 
@@ -192,7 +212,7 @@ describe('backup v2', () => {
 describe('detectBackupFormat', () => {
   it('recognizes v2, v1, plain JSON and garbage', async () => {
     const { envelope, dataKey } = await accountWithKit();
-    expect(detectBackupFormat(await exportBackupV2(JSON.stringify(DATA), dataKey, envelope))).toBe('v2');
+    expect(detectBackupFormat(await exportBackupV2(JSON.stringify(DATA), dataKey, backupWrapsFromEnvelope(envelope)))).toBe('v2');
     expect(detectBackupFormat(await encryptBackup('senha', JSON.stringify(DATA)))).toBe('v1');
     expect(detectBackupFormat(JSON.stringify(DATA))).toBe('plain');
     expect(detectBackupFormat('não é json')).toBe('unknown');
