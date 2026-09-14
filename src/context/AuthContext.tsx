@@ -7,15 +7,31 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { createAuthProvider } from '../lib/auth';
-import type { AuthProviderV2, KitRenewal, RegisterResult, UserAccount } from '../lib/auth';
+import type {
+  AuthProviderV2,
+  AuthSession,
+  KeyInfo,
+  KitRenewal,
+  RegisterResult,
+  SyncStatus,
+  UserAccount,
+} from '../lib/auth';
 import { AuthCtx } from './AuthContext.shared';
 import type { AuthState } from './AuthContext.shared';
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [provider] = useState<AuthProviderV2>(() => createAuthProvider());
+export function AuthProvider({
+  children,
+  provider: providedProvider,
+}: {
+  children: ReactNode;
+  /** Cloud builds pass the provider they loaded; local builds use the default. */
+  provider?: AuthProviderV2;
+}) {
+  const [provider] = useState<AuthProviderV2>(() => providedProvider ?? createAuthProvider());
   const [state, setState] = useState<AuthState>({ status: 'locked' });
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(() => provider.getSyncStatus?.() ?? null);
   const dataKeyRef = useRef<CryptoKey | null>(null);
 
   const refreshUsers = useCallback(async () => {
@@ -40,9 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [provider]);
 
+  useEffect(() => provider.subscribeSync?.(setSyncStatus), [provider]);
+
   const lock = useCallback(() => {
     dataKeyRef.current = null;
-    void provider.signOut();
+    void provider.lock();
     setState({ status: 'locked' });
   }, [provider]);
 
@@ -52,15 +70,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   }, [provider, refreshUsers]);
 
-  const signIn = useCallback(async (userId: string, password: string) => {
-    const { session } = await provider.signIn({ userId, password });
+  const completeUnlock = useCallback((session: AuthSession) => {
     dataKeyRef.current = session.dataKey;
     setState({ status: 'unlocked', session });
-  }, [provider]);
+  }, []);
+
+  const signIn = useCallback(async (userId: string, password: string) => {
+    const result = await provider.signIn({ userId, password });
+    if (result.status !== 'unlocked') throw new Error('Não foi possível abrir a conta.');
+    completeUnlock(result.session);
+  }, [provider, completeUnlock]);
 
   const signOut = useCallback(() => {
-    lock();
-  }, [lock]);
+    dataKeyRef.current = null;
+    void provider.signOut();
+    setState({ status: 'locked' });
+  }, [provider]);
 
   const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
     if (state.status !== 'unlocked') throw new Error('Sessão expirada.');
@@ -115,12 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state],
   );
 
-  const getEnvelope = useCallback(
-    () => {
-      if (state.status !== 'unlocked') return null;
-      return users.find(user => user.id === state.session.userId)?.envelope ?? null;
-    },
-    [state, users],
+  const getKeyInfo = useCallback(
+    (): KeyInfo | null => (state.status === 'unlocked' ? provider.describeKeys(state.session) : null),
+    // users changes after local key changes (refreshUsers), which must re-read the keys.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [provider, state, users],
   );
 
   // Auto-lock on page unload
@@ -136,28 +160,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.status !== 'unlocked') return;
     const { userId } = state.session;
-    let snapshot: string | null = null;
-    let active = true;
-
-    const envelopeOf = async () =>
-      JSON.stringify((await provider.listLocalAccounts()).find(user => user.id === userId)?.envelope ?? null);
-
-    envelopeOf().then(value => { snapshot = value; });
+    const snapshot = provider.keysFingerprint(userId);
 
     function handleStorage(event: StorageEvent) {
       if (event.storageArea !== localStorage) return;
-      envelopeOf().then(current => {
-        if (!active || snapshot === null || current === snapshot) return;
-        lock();
-        void refreshUsers();
-      });
+      if (provider.keysFingerprint(userId) === snapshot) return;
+      lock();
+      void refreshUsers();
     }
 
     window.addEventListener('storage', handleStorage);
-    return () => {
-      active = false;
-      window.removeEventListener('storage', handleStorage);
-    };
+    return () => window.removeEventListener('storage', handleStorage);
   }, [state, provider, lock, refreshUsers]);
 
   // Auto-lock after 15 minutes of inactivity
@@ -191,16 +204,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         usersLoaded,
         provider,
         vaultStore,
+        syncStatus,
         register,
         signIn,
+        completeUnlock,
         signOut,
+        lock,
         changePassword,
         deleteAccount,
         prepareKitRenewal,
         getDataKey,
         getUserId,
         getDisplayName,
-        getEnvelope,
+        getKeyInfo,
         refreshUsers,
       }}
     >

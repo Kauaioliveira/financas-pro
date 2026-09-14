@@ -21,7 +21,7 @@ function formatKitDate(iso: string): string {
  * component, which drops the phrase and the pending renewal.
  */
 export function RecoveryKitSettings() {
-  const { getEnvelope, getDisplayName, prepareKitRenewal } = useAuth();
+  const { getKeyInfo, getDisplayName, prepareKitRenewal, mode } = useAuth();
   const passwordId = useId();
   const [step, setStep] = useState<KitStep>('idle');
   const [password, setPassword] = useState('');
@@ -31,9 +31,9 @@ export function RecoveryKitSettings() {
   const [renewal, setRenewal] = useState<KitRenewal | null>(null);
   const [done, setDone] = useState<{ previousKitId: string | null } | null>(null);
 
-  const envelope = getEnvelope();
-  const hasKitMetadata = Boolean(envelope?.kitId && envelope?.kitCreatedAt);
-  const hasLegacyKit = !hasKitMetadata && Boolean(envelope?.recoveryWrap);
+  const keyInfo = getKeyInfo();
+  const hasKitMetadata = Boolean(keyInfo?.kitId && keyInfo?.kitCreatedAt);
+  const hasLegacyKit = !hasKitMetadata && Boolean(keyInfo?.hasKit);
 
   function cancel() {
     setStep('idle');
@@ -82,10 +82,10 @@ export function RecoveryKitSettings() {
     <div className="mt-4 border-t border-white/10 pt-4">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Kit de recuperação</p>
       <p className="mt-2 text-sm text-slate-300">
-        {hasKitMetadata && envelope?.kitId && envelope.kitCreatedAt ? (
+        {hasKitMetadata && keyInfo?.kitId && keyInfo.kitCreatedAt ? (
           <>
-            Kit atual: id <span className="font-mono font-semibold text-slate-100">{envelope.kitId}</span>, criado em{' '}
-            {formatKitDate(envelope.kitCreatedAt)}
+            Kit atual: id <span className="font-mono font-semibold text-slate-100">{keyInfo.kitId}</span>, criado em{' '}
+            {formatKitDate(keyInfo.kitCreatedAt)}
           </>
         ) : hasLegacyKit ? (
           'Kit criado no cadastro'
@@ -209,6 +209,7 @@ export function RecoveryKitSettings() {
             phrase={renewal.phrase}
             kitId={renewal.kitId}
             createdAt={renewal.kitCreatedAt}
+            variant={mode}
           />
           <div className="mt-2 flex gap-2">
             <button

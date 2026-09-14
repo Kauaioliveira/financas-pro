@@ -11,6 +11,7 @@ import { Settings, Trash2, X, AlertTriangle, Menu, LogOut, UserCog } from 'lucid
 import { useFinance } from './context/useFinance';
 import { SettingsModal } from './components/SettingsModal';
 import { VaultLoadErrorScreen } from './components/VaultLoadErrorScreen';
+import { SyncBadge } from './components/SyncBadge';
 import type { ThemePreference } from './components/SettingsModal';
 
 const THEME_KEY = 'financaspro_theme';
@@ -35,7 +36,27 @@ const CategoryRules = lazy(async () => ({
   default: (await import('./components/CategoryRules')).CategoryRules,
 }));
 
+// Cloud builds only: with __FINANCASPRO_CLOUD__ false this is dead code, so neither the
+// cloud screens nor @supabase/supabase-js end up in the local bundle.
+const CloudRoot = __FINANCASPRO_CLOUD__ ? lazy(() => import('./components/cloud/CloudRoot')) : null;
+
 function App() {
+  if (CloudRoot) {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center" style={{ background: 'var(--app-bg)' }}>
+            <p role="status" className="text-sm text-slate-400">Carregando...</p>
+          </div>
+        }
+      >
+        <CloudRoot>
+          <SecureApp />
+        </CloudRoot>
+      </Suspense>
+    );
+  }
+
   return (
     <AuthProvider>
       <AuthGate>
@@ -111,7 +132,7 @@ function AppShell({
   content: ReactNode;
 }) {
   const { clearAll, exportFinanceBackup, importFinanceBackup, saveError, retrySave } = useFinance();
-  const { signOut, getDisplayName, users } = useAuth();
+  const { signOut, getDisplayName, users, syncStatus } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
@@ -216,6 +237,7 @@ function AppShell({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              {__FINANCASPRO_CLOUD__ && syncStatus && <SyncBadge status={syncStatus} />}
               <button
                 onClick={() => setIsSidebarOpen(true)}
                 className="shell-icon-button hover:text-cyan-100 lg:hidden"

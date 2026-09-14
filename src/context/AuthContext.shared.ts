@@ -3,11 +3,12 @@ import type {
   AuthMode,
   AuthProviderV2,
   AuthSession,
+  KeyInfo,
   KitRenewal,
   RegisterResult,
+  SyncStatus,
   UserAccount,
 } from '../lib/auth';
-import type { VaultEnvelope } from '../lib/crypto';
 import type { VaultStore } from '../lib/vault';
 
 export type AuthState =
@@ -23,10 +24,18 @@ export interface AuthContextType {
   provider: AuthProviderV2;
   /** Vault storage for the unlocked session, or null when locked. */
   vaultStore: VaultStore | null;
+  /** Cloud sync state, or null for local accounts. */
+  syncStatus: SyncStatus | null;
   /** Creates the account and its recovery kit without unlocking the app. */
   register: (displayName: string, password: string) => Promise<RegisterResult>;
+  /** Local accounts: sign in by id. */
   signIn: (userId: string, password: string) => Promise<void>;
+  /** Opens the app with a session obtained from a provider flow (cloud screens). */
+  completeUnlock: (session: AuthSession) => void;
+  /** Ends the session. */
   signOut: () => void;
+  /** Drops the keys from memory (idle, other tab). */
+  lock: () => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   /** Re-authenticates and generates a kit in memory; nothing is saved until commit(). */
@@ -34,7 +43,8 @@ export interface AuthContextType {
   getDataKey: () => CryptoKey | null;
   getUserId: () => string | null;
   getDisplayName: () => string;
-  getEnvelope: () => VaultEnvelope | null;
+  /** Kit and backup information of the session, or null when locked. */
+  getKeyInfo: () => KeyInfo | null;
   refreshUsers: () => Promise<void>;
 }
 

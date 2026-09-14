@@ -1,13 +1,8 @@
-export interface CloudEnv {
-  VITE_APP_MODE?: string;
-  VITE_SUPABASE_URL?: string;
-  VITE_SUPABASE_PUBLISHABLE_KEY?: string;
-}
+export { isCloudEnabled, isSecretSupabaseKey, readCloudConfig } from './env';
+export type { CloudConfig, CloudEnv } from './env';
 
-/** Cloud mode needs both public variables and must not be forced off with VITE_APP_MODE=local. */
-export function isCloudEnabled(env: CloudEnv): boolean {
-  if (env.VITE_APP_MODE?.trim().toLowerCase() === 'local') return false;
-  return Boolean(env.VITE_SUPABASE_URL?.trim() && env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim());
-}
-
-export const cloudEnabled = isCloudEnabled(import.meta.env);
+/**
+ * Decided at build time from the same variables (see vite.config.ts). When false,
+ * the bundler drops every cloud module, including @supabase/supabase-js.
+ */
+export const cloudEnabled: boolean = __FINANCASPRO_CLOUD__;

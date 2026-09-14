@@ -1,5 +1,6 @@
 import { RECOVERY_WORD_COUNT } from './constants';
 import { fromBase64, subtle, toHex } from './utils';
+import { normalizePhrase } from './wordlist';
 
 export const KIT_CONFIRMATION_COUNT = 3;
 const KIT_ID_HEX_CHARS = 6;
@@ -19,6 +20,11 @@ export function splitPhrase(phrase: string): string[] {
 /** Lowercase, trimmed and without accents, so "Leão" matches "leao". */
 export function normalizeKitWord(word: string): string {
   return word.normalize('NFD').replace(COMBINING_MARKS, '').trim().toLowerCase();
+}
+
+/** The phrase as it is fed to key derivation: lowercase, single spaces, no accents. */
+export function normalizeKitPhrase(phrase: string): string {
+  return normalizePhrase(phrase).split(' ').map(normalizeKitWord).join(' ');
 }
 
 /** Distinct 1-based positions in ascending order, drawn with crypto randomness. */

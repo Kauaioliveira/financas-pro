@@ -25,11 +25,14 @@ export function RecoveryKitSheet({
   phrase,
   kitId,
   createdAt,
+  variant = 'local',
 }: {
   accountName: string;
   phrase: string;
   kitId: string;
   createdAt: string;
+  /** Cloud accounts recover through the e-mail link; local accounts on this computer. */
+  variant?: 'local' | 'cloud';
 }) {
   const words = splitPhrase(phrase);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -143,8 +146,9 @@ export function RecoveryKitSheet({
           <h2>Como usar</h2>
           <ul>
             <li>
-              Se esquecer a senha, abra o FinançasPro neste computador, clique em “Esqueci minha
-              senha” e digite as 12 palavras na ordem.
+              {variant === 'cloud'
+                ? 'Se esquecer a senha, use “Esqueci a senha” no FinançasPro, abra o link que chega por e-mail, crie uma senha nova e digite as 12 palavras na ordem.'
+                : 'Se esquecer a senha, abra o FinançasPro neste computador, clique em “Esqueci minha senha” e digite as 12 palavras na ordem.'}
             </li>
             <li>
               Guarde este papel longe do computador. Não fotografe e não salve em nuvem, e-mail ou
@@ -155,8 +159,9 @@ export function RecoveryKitSheet({
               estava ativo.
             </li>
             <li>
-              Quem tiver estas palavras e acesso ao seu computador ou a um backup consegue ver seus
-              dados.
+              {variant === 'cloud'
+                ? 'Quem tiver estas palavras e acesso à sua conta ou a um backup consegue ver seus dados.'
+                : 'Quem tiver estas palavras e acesso ao seu computador ou a um backup consegue ver seus dados.'}
             </li>
             <li>
               Se você gerar um kit novo em Configurações, este kit (id {kitId}) deixa de abrir a

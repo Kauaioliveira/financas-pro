@@ -3,7 +3,7 @@ import { createLocalAuthProvider } from './localAuthProvider';
 import { recoverWithPhrase } from '../crypto';
 import type { VaultEnvelope } from '../crypto';
 import { loadVaultData } from '../../utils/secureStorage';
-import { exportBackupV2, importBackupV2 } from '../../utils/backup';
+import { backupWrapsFromEnvelope, exportBackupV2, importBackupV2 } from '../../utils/backup';
 import legacyFixture from '../../test/fixtures/legacy-v1.json';
 
 // An account exactly as the previous code stored it (PBKDF2 310k, no kit id).
@@ -33,9 +33,7 @@ describe('existing local account (legacy fixture)', () => {
     const provider = createLocalAuthProvider();
     const session = await provider.signIn(account.id, legacyFixture.password);
     const file = await exportBackupV2(
-      JSON.stringify(legacyFixture.expectedBackup),
-      session.dataKey,
-      provider.getEnvelope(account.id) as VaultEnvelope,
+      JSON.stringify(legacyFixture.expectedBackup), session.dataKey, backupWrapsFromEnvelope(provider.getEnvelope(account.id) as VaultEnvelope),
     );
 
     expect(JSON.parse(file).wraps.kit.id).toBeNull();
