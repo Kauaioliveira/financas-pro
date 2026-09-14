@@ -1,4 +1,4 @@
-import { PBKDF2_ITERATIONS, SALT_BYTES, IV_BYTES, KEY_BYTES, VAULT_VERSION } from './constants';
+import { LEGACY_KIT_ITERATIONS, PBKDF2_ITERATIONS, SALT_BYTES, IV_BYTES, KEY_BYTES, VAULT_VERSION } from './constants';
 import { getRandomBytes, toBase64, fromBase64, subtle } from './utils';
 import { compress, decompress } from './compression';
 import { computeKitId } from './kit';
@@ -26,6 +26,8 @@ export interface VaultEnvelope {
   recoveryWrap?: string;
   recoveryWrapIv?: string;
   recoverySalt?: string;
+  /** PBKDF2 iterations of the recovery wrap. Absent in kits created before it was recorded (LEGACY_KIT_ITERATIONS). */
+  recoveryIterations?: number;
   /** Short public id of the recovery kit (not secret). Absent in accounts created before renewable kits. */
   kitId?: string;
   /** ISO date the recovery kit was created (not secret). Absent in accounts created before renewable kits. */
@@ -36,6 +38,7 @@ export interface RecoveryKitWrap {
   recoveryWrap: string;
   recoveryWrapIv: string;
   recoverySalt: string;
+  recoveryIterations: number;
   kitId: string;
   kitCreatedAt: string;
 }
@@ -202,6 +205,7 @@ export async function changeVaultPassword(
     next.recoveryWrap = envelope.recoveryWrap;
     next.recoveryWrapIv = envelope.recoveryWrapIv;
     next.recoverySalt = envelope.recoverySalt;
+    if (envelope.recoveryIterations !== undefined) next.recoveryIterations = envelope.recoveryIterations;
   }
 
   return next;
@@ -217,9 +221,10 @@ export async function createRecoveryKitWrap(
   recoveryPhrase: string,
   dataKey: CryptoKey,
   createdAt: Date = new Date(),
+  iterations: number = PBKDF2_ITERATIONS,
 ): Promise<RecoveryKitWrap> {
   const recoverySalt = getRandomBytes(SALT_BYTES);
-  const { authKeyRaw } = await deriveAuthAndVerifier(recoveryPhrase, recoverySalt);
+  const { authKeyRaw } = await deriveAuthAndVerifier(recoveryPhrase, recoverySalt, iterations);
   const { wrapped, iv } = await wrapDataKey(authKeyRaw, dataKey);
   const recoveryWrap = toBase64(wrapped);
 
@@ -227,6 +232,7 @@ export async function createRecoveryKitWrap(
     recoveryWrap,
     recoveryWrapIv: toBase64(iv),
     recoverySalt: toBase64(recoverySalt),
+    recoveryIterations: iterations,
     kitId: await computeKitId(recoveryWrap),
     kitCreatedAt: createdAt.toISOString(),
   };
@@ -285,13 +291,15 @@ export async function rotateVaultKey(
 }
 
 /**
- * Opens a recovery wrap and returns the data key. Recovery wraps never stored
- * their iteration count, so it defaults to the count local accounts always used.
+ * Opens a recovery wrap and returns the data key. The iteration count comes
+ * from the wrap; kits created before it was recorded used LEGACY_KIT_ITERATIONS.
  */
 export async function unlockRecoveryWrap(
   recoveryPhrase: string,
-  wrap: Pick<RecoveryKitWrap, 'recoveryWrap' | 'recoveryWrapIv' | 'recoverySalt'>,
-  iterations: number = PBKDF2_ITERATIONS,
+  wrap: Pick<RecoveryKitWrap, 'recoveryWrap' | 'recoveryWrapIv' | 'recoverySalt'> & {
+    recoveryIterations?: number;
+  },
+  iterations: number = wrap.recoveryIterations ?? LEGACY_KIT_ITERATIONS,
 ): Promise<CryptoKey> {
   const { authKeyRaw } = await deriveAuthAndVerifier(
     recoveryPhrase,
@@ -322,6 +330,7 @@ export async function recoverWithPhrase(
     recoveryWrap: envelope.recoveryWrap,
     recoveryWrapIv: envelope.recoveryWrapIv,
     recoverySalt: envelope.recoverySalt,
+    recoveryIterations: envelope.recoveryIterations,
   });
 
   const newSalt = getRandomBytes(SALT_BYTES);
@@ -351,6 +360,7 @@ export async function recoverWithPhrase(
     recoveryWrap: toBase64(newRecoveryWrapped),
     recoveryWrapIv: toBase64(newRecoveryIv),
     recoverySalt: toBase64(newRecoverySalt),
+    recoveryIterations: PBKDF2_ITERATIONS,
   };
 }
 

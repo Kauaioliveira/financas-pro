@@ -10,6 +10,7 @@ import type { TabType } from './types';
 import { Settings, Trash2, X, AlertTriangle, Menu, LogOut, UserCog } from 'lucide-react';
 import { useFinance } from './context/useFinance';
 import { SettingsModal } from './components/SettingsModal';
+import { VaultLoadErrorScreen } from './components/VaultLoadErrorScreen';
 import type { ThemePreference } from './components/SettingsModal';
 
 const THEME_KEY = 'financaspro_theme';
@@ -47,7 +48,7 @@ function App() {
 export default App;
 
 function SecureApp() {
-  const { vaultStore, getUserId } = useAuth();
+  const { vaultStore, getUserId, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isResetOpen, setIsResetOpen] = useState(false);
 
@@ -75,7 +76,11 @@ function SecureApp() {
   }
 
   return (
-    <FinanceProvider key={getUserId()!} store={vaultStore!}>
+    <FinanceProvider
+      key={getUserId()!}
+      store={vaultStore!}
+      renderLoadError={actions => <VaultLoadErrorScreen {...actions} onSignOut={signOut} />}
+    >
       <ImportDraftProvider>
         <AppShell
           activeTab={activeTab}
@@ -105,7 +110,7 @@ function AppShell({
   setIsResetOpen: (v: boolean) => void;
   content: ReactNode;
 }) {
-  const { clearAll, exportFinanceBackup, importFinanceBackup } = useFinance();
+  const { clearAll, exportFinanceBackup, importFinanceBackup, saveError, retrySave } = useFinance();
   const { signOut, getDisplayName, users } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -264,6 +269,35 @@ function AppShell({
             </div>
           </div>
         </header>
+
+        {saveError && (
+          <div
+            role="alert"
+            className="mx-4 mt-3 flex flex-col gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 sm:mx-6 sm:flex-row sm:items-center"
+          >
+            <AlertTriangle className="hidden h-4 w-4 flex-shrink-0 text-rose-300 sm:block" aria-hidden="true" />
+            <p className="flex-1">
+              <strong className="font-semibold">Alterações não salvas.</strong> {saveError} Não feche o app até
+              salvar ou exportar.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={retrySave}
+                className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/[0.10] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              >
+                Tentar salvar de novo
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/[0.10] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              >
+                Exportar backup
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="relative flex-1 overflow-y-auto">
           <Suspense fallback={<ContentLoader label={tabTitle} />}>{content}</Suspense>

@@ -36,7 +36,8 @@ export function BackupSettings({
   importData,
 }: {
   exportData?: () => string;
-  importData?: (json: string) => void;
+  /** May be async; the success message only appears after it resolves. */
+  importData?: (json: string) => void | Promise<void>;
 }) {
   const { getDataKey, getEnvelope } = useAuth();
   const backupInputRef = useRef<HTMLInputElement>(null);
@@ -162,7 +163,7 @@ export function BackupSettings({
         data = importPlainBackup(fileContent);
       }
 
-      importData(JSON.stringify(data));
+      await importData(JSON.stringify(data));
       setImportMsg(summarize(data));
       setImportState('success');
       setFileContent('');

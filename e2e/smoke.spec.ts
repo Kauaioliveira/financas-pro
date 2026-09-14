@@ -3,6 +3,8 @@ import type { Page } from '@playwright/test';
 
 /** Reads the 12 words on screen and types the 3 the app asks for. */
 async function confirmKitWords(page: Page, submitName: RegExp) {
+  // allInnerTexts() does not wait: the kit appears only after the keys are derived.
+  await expect(page.locator('[data-kit-word]')).toHaveCount(12, { timeout: 10_000 });
   const words = await page.locator('[data-kit-word]').allInnerTexts();
   expect(words).toHaveLength(12);
 
@@ -93,6 +95,9 @@ test.describe('Smoke — kit de recuperação', () => {
       timeout: 10_000,
     });
     await expect(page.getByText(/kit atual: id/i)).not.toHaveText(oldKitText);
+    // The data key rotated: pending saves go through the new key, with no save error.
+    await page.waitForTimeout(1_000);
+    await expect(page.getByText(/alterações não salvas/i)).toHaveCount(0);
   });
 });
 

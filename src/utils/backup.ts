@@ -9,7 +9,7 @@ import {
   unlockVault,
 } from '../lib/crypto';
 import type { VaultEnvelope } from '../lib/crypto';
-import { PBKDF2_ITERATIONS } from '../lib/crypto/constants';
+import { LEGACY_KIT_ITERATIONS } from '../lib/crypto/constants';
 
 const MAX_BACKUP_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -160,8 +160,8 @@ export async function exportBackupV2(
             id: envelope.kitId ?? null,
             createdAt: envelope.kitCreatedAt ?? null,
             salt: envelope.recoverySalt!,
-            // Recovery wraps always used this count; record it so the file is self-describing.
-            iterations: PBKDF2_ITERATIONS,
+            // Kits without a recorded count used the legacy count; the file is always self-describing.
+            iterations: envelope.recoveryIterations ?? LEGACY_KIT_ITERATIONS,
             iv: envelope.recoveryWrapIv!,
             wrapped: envelope.recoveryWrap!,
           }

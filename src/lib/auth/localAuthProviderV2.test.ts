@@ -106,6 +106,44 @@ describe('localAuthProviderV2', () => {
     );
   });
 
+  it('a store created before a kit renewal refuses to write with the old key', async () => {
+    const { session: created } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
+    const { session } = await provider.signIn({ userId: created.userId, password: 'senha123' });
+    const oldStore = provider.createVaultStore(session);
+    await oldStore.save({ rules: [1] });
+
+    const newKey = await (await provider.prepareKitRenewal('senha123')).commit();
+    const vaultAfterRenewal = localStorage.getItem(`financaspro_${session.userId}_vault`);
+
+    await expect(oldStore.save({ rules: [2] })).rejects.toMatchObject({ reason: 'stale-key' });
+    expect(localStorage.getItem(`financaspro_${session.userId}_vault`)).toBe(vaultAfterRenewal);
+
+    const newStore = provider.createVaultStore({ ...session, dataKey: newKey });
+    await newStore.save({ rules: [2] });
+    expect(await newStore.load()).toEqual({ rules: [2] });
+  });
+
+  it('a store refuses to write after the account is deleted (edge)', async () => {
+    const { session } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
+    const store = provider.createVaultStore(session);
+    await provider.deleteLocalAccount(session.userId, 'senha123');
+    await expect(store.save({ rules: [1] })).rejects.toMatchObject({ reason: 'stale-key' });
+    expect(localStorage.getItem(`financaspro_${session.userId}_vault`)).toBeNull();
+  });
+
+  it('a vault that does not open is reported, not replaced by {}', async () => {
+    const { session } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
+    localStorage.setItem(`financaspro_${session.userId}_vault`, '{"garbage":true}');
+    const store = provider.createVaultStore(session);
+    await expect(store.load()).rejects.toMatchObject({ name: 'VaultLoadError' });
+    await store.preserveUnreadable();
+    const copies = Object.keys(Object.fromEntries(
+      Array.from({ length: localStorage.length }, (_, i) => [localStorage.key(i), 1]),
+    )).filter(key => key.includes('_vault_unreadable_'));
+    expect(copies).toHaveLength(1);
+    expect(localStorage.getItem(copies[0])).toBe('{"garbage":true}');
+  });
+
   it('deletes a local account with the right password', async () => {
     const { session } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
     await expect(provider.deleteLocalAccount(session.userId, 'errada')).rejects.toThrow('Senha incorreta.');

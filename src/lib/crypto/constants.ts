@@ -1,4 +1,6 @@
 export const PBKDF2_ITERATIONS = 310_000;
+/** Kits created before wraps recorded their iteration count always used this value. Never change it. */
+export const LEGACY_KIT_ITERATIONS = 310_000;
 export const SALT_BYTES = 32;
 export const IV_BYTES = 12;
 export const KEY_BYTES = 32;

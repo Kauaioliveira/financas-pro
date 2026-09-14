@@ -109,7 +109,15 @@ export function createLocalAuthProviderV2(
     },
 
     createVaultStore(session: AuthSession) {
-      return createLocalVaultStore(session.userId, session.dataKey);
+      // The wrapped key changes whenever the account keys change (kit renewal rotates
+      // the data key; password change re-wraps it), in this tab or another one. A store
+      // created before that refuses to write, so the vault is never saved with an old key.
+      const wrappedAtCreation = base.getEnvelope(session.userId)?.wrappedDataKey ?? null;
+      return createLocalVaultStore(session.userId, session.dataKey, {
+        isKeyCurrent: () =>
+          wrappedAtCreation !== null &&
+          base.getEnvelope(session.userId)?.wrappedDataKey === wrappedAtCreation,
+      });
     },
   };
 }
