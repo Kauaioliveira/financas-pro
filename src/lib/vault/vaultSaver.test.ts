@@ -126,6 +126,17 @@ describe('createVaultSaver', () => {
     expect(saver.getStatus().state).toBe('idle');
   });
 
+  it('counts every schedule, so callers can tell data changed during an async step', async () => {
+    const a = fakeStore();
+    const saver = createVaultSaver(a.store, 300);
+    const start = saver.getRevision();
+    saver.schedule({ v: 1 });
+    saver.schedule({ v: 2 });
+    expect(saver.getRevision()).toBe(start + 2);
+    await saver.flush();
+    expect(saver.getRevision()).toBe(start + 2);
+  });
+
   it('uses the store current at write time', async () => {
     const a = fakeStore();
     const b = fakeStore();

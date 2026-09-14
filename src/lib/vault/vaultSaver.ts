@@ -19,6 +19,8 @@ export interface VaultSaver {
   /** Tries the last failed save again. */
   retry(): Promise<void>;
   getStatus(): VaultSaverStatus;
+  /** Increases on every schedule(): tells whether the data changed during an async step. */
+  getRevision(): number;
   subscribe(listener: (status: VaultSaverStatus) => void): () => void;
 }
 
@@ -41,6 +43,7 @@ export function createVaultSaver(initialStore: VaultStore, debounceMs = 300): Va
   let timer: ReturnType<typeof setTimeout> | null = null;
   let inFlight: Promise<void> | null = null;
   let status: VaultSaverStatus = { state: 'idle' };
+  let revision = 0;
   const listeners = new Set<(status: VaultSaverStatus) => void>();
 
   function setStatus(next: VaultSaverStatus): void {
@@ -92,6 +95,7 @@ export function createVaultSaver(initialStore: VaultStore, debounceMs = 300): Va
 
   return {
     schedule(data: VaultData): void {
+      revision += 1;
       pending = data;
       clearTimer();
       if (status.state === 'waiting-store') return; // wait for setStore
@@ -123,6 +127,7 @@ export function createVaultSaver(initialStore: VaultStore, debounceMs = 300): Va
     },
 
     getStatus: () => status,
+    getRevision: () => revision,
 
     subscribe(listener) {
       listeners.add(listener);

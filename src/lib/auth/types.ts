@@ -122,6 +122,10 @@ export interface AuthProviderV2 {
   getSyncStatus?(): SyncStatus;
   /** Cloud only. Returns the unsubscribe function. */
   subscribeSync?(listener: (status: SyncStatus) => void): () => void;
+  /** Cloud only: the user's explicit choice after a version conflict. */
+  resolveSyncConflict?(choice: 'use-remote' | 'keep-local'): Promise<void>;
+  /** Cloud only: check the cloud and send pending edits now. */
+  syncNow?(): Promise<void>;
   /** Accounts known on this device (cloud: cached accounts). */
   listLocalAccounts(): Promise<UserAccount[]>;
   register(input: RegisterInput): Promise<RegisterResult>;

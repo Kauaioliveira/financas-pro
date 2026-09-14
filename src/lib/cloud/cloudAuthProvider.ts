@@ -22,6 +22,8 @@ import type { CloudBackend, CloudUser, VaultRow } from './backend';
 import { createCloudVaultStore } from './cloudVaultStore';
 import { CloudError, isCloudError } from './errors';
 import { checkCloudPassword } from './passwordPolicy';
+import { createSyncEngine } from './syncEngine';
+import type { ConflictChoice, SyncEngine } from './syncEngine';
 import {
   findCloudCacheUserId,
   getDeviceId,
@@ -66,6 +68,8 @@ export interface VaultSetup {
 
 export interface CloudAuthProvider extends Omit<AuthProviderV2, 'mode'> {
   readonly mode: 'cloud';
+  resolveSyncConflict(choice: ConflictChoice): Promise<void>;
+  syncNow(): Promise<void>;
   start(): Promise<CloudStart>;
   signUp(input: CloudSignUpInput): Promise<SignInResult>;
   /** Requires a previous sign-in (or sign-up) that returned needs-vault-setup. */
@@ -95,6 +99,11 @@ interface Current {
 
 const NOT_AVAILABLE = 'Esta ação não existe no modo nuvem.';
 
+/** The browser knows it has no connection: skip calls that would only wait for retries. */
+function browserOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
 function displayNameFor(user: CloudUser | null, cache: CloudCache | null, email: string): string {
   return cache?.displayName || user?.displayName || email.split('@')[0] || 'Você';
 }
@@ -104,6 +113,42 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
   let pending: Pending | null = null;
   let syncStatus: SyncStatus = { state: 'synced', message: null, lastSyncedAt: null };
   const syncListeners = new Set<(status: SyncStatus) => void>();
+  const remoteListeners = new Set<() => void>();
+  let engine: SyncEngine | null = null;
+  let detachTriggers: () => void = () => {};
+
+  function startEngine(userId: string, dataKey: CryptoKey): void {
+    stopEngine();
+    const started = createSyncEngine({
+      backend,
+      userId,
+      dataKey,
+      deviceId: getDeviceId(),
+      now,
+      initialStatus: syncStatus,
+      onStatus: setSync,
+      onRemoteApplied: () => {
+        for (const listener of remoteListeners) listener();
+      },
+    });
+    engine = started;
+    detachTriggers = started.attachBrowserTriggers();
+    void started.sync();
+  }
+
+  function stopEngine(): void {
+    detachTriggers();
+    detachTriggers = () => {};
+    engine?.stop();
+    engine = null;
+  }
+
+  /** Tries to send pending edits before the session ends, without blocking for long. */
+  async function flushBeforeLeaving(): Promise<void> {
+    const running = engine;
+    if (!running) return;
+    await Promise.race([running.pushNow().catch(() => undefined), new Promise(resolve => setTimeout(resolve, 3_000))]);
+  }
 
   function setSync(next: SyncStatus): void {
     syncStatus = next;
@@ -141,7 +186,41 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     current = { session, email: cache.email };
     pending = null;
     setSync(status);
+    startEngine(cache.userId, dataKey);
     return session;
+  }
+
+  /**
+   * The password opened the cache, but the account keys may have changed on another
+   * device with the same password (kit renewal rotates the data key). Adopt the new
+   * keys only when they open with this password and decrypt the cloud data; unsent
+   * local edits are re-encrypted with the new key and stay pending (the sync then
+   * asks what to keep). Returns the cache and key to open with.
+   */
+  async function adoptKeysChangedElsewhere(
+    cached: CloudCache,
+    cachedKey: CryptoKey,
+    keys: AccountKeys,
+  ): Promise<{ cache: CloudCache; dataKey: CryptoKey }> {
+    const meta = await backend.fetchVaultMeta();
+    if (!meta || meta.keysVersion === cached.keysVersion) return { cache: cached, dataKey: cachedKey };
+    const row = await backend.fetchVault();
+    const remoteKey = row ? await openPasswordWrap(keys.pwWrapKey, row.pwWrap) : null;
+    if (!row || !remoteKey || !(await canDecryptVault(remoteKey, row.ciphertext))) {
+      return { cache: cached, dataKey: cachedKey };
+    }
+    const keysFromCloud = { kdf: row.kdf, pwWrap: row.pwWrap, kitWrap: row.kitWrap, keysVersion: row.keysVersion };
+    let next: CloudCache;
+    if (!cached.dirty) {
+      next = { ...cached, ...keysFromCloud, ciphertext: row.ciphertext, version: row.version, lastSyncedAt: now().toISOString() };
+    } else if (await canDecryptVault(remoteKey, cached.ciphertext)) {
+      next = { ...cached, ...keysFromCloud };
+    } else {
+      const localData = await decryptVault(cachedKey, cached.ciphertext);
+      next = { ...cached, ...keysFromCloud, ciphertext: await encryptVault(remoteKey, localData) };
+    }
+    writeCloudCache(next);
+    return { cache: next, dataKey: remoteKey };
   }
 
   function statusFor(cache: CloudCache, offline: boolean, message: string | null = null): SyncStatus {
@@ -260,6 +339,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
       let user: CloudUser | null = null;
       let authError: CloudError | null = null;
       try {
+        if (cachedKey && browserOffline()) throw new CloudError('network');
         const sessionUser = cachedKey ? await backend.getSessionUser() : null;
         user =
           sessionUser && normalizeEmail(sessionUser.email) === email
@@ -280,7 +360,17 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
           };
         }
         if (authError?.kind === 'email-not-confirmed') return { status: 'needs-email-confirmation', email };
-        return { status: 'unlocked', session: open(cached, cachedKey, statusFor(cached, authError !== null)) };
+        let opened = { cache: cached, dataKey: cachedKey };
+        if (!authError && browserOffline()) authError = new CloudError('network');
+        if (!authError) {
+          try {
+            opened = await adoptKeysChangedElsewhere(cached, cachedKey, keys);
+          } catch (err) {
+            if (!isCloudError(err)) throw err;
+            authError = err; // offline or server trouble: open from the cache as it is
+          }
+        }
+        return { status: 'unlocked', session: open(opened.cache, opened.dataKey, statusFor(opened.cache, authError !== null)) };
       }
 
       if (authError) {
@@ -347,11 +437,15 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     },
 
     async lock() {
+      await flushBeforeLeaving();
+      stopEngine();
       current = null;
       pending = null;
     },
 
     async signOut() {
+      await flushBeforeLeaving();
+      stopEngine();
       current = null;
       pending = null;
       try {
@@ -460,6 +554,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
           }
           if (current?.session.userId === session.userId) {
             current = { ...current, session: { ...current.session, dataKey } };
+            startEngine(session.userId, dataKey);
           }
           return dataKey;
         },
@@ -470,8 +565,12 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
       return createCloudVaultStore({
         userId: session.userId,
         dataKey: session.dataKey,
-        onLocalChange: () => {
-          if (syncStatus.state === 'synced') setSync({ ...syncStatus, state: 'pending' });
+        onLocalChange: () => engine?.notifyLocalChange(),
+        subscribeRemote: listener => {
+          remoteListeners.add(listener);
+          return () => {
+            remoteListeners.delete(listener);
+          };
         },
       });
     },
@@ -503,6 +602,14 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     },
 
     getSyncStatus: () => syncStatus,
+
+    resolveSyncConflict(choice: ConflictChoice) {
+      return engine ? engine.resolveConflict(choice) : Promise.resolve();
+    },
+
+    syncNow() {
+      return engine ? engine.sync() : Promise.resolve();
+    },
 
     subscribeSync(listener) {
       syncListeners.add(listener);

@@ -123,6 +123,17 @@ export function AuthProvider({
     };
   }, [provider, state, refreshUsers]);
 
+  const resolveSyncConflict = useCallback(
+    async (choice: 'use-remote' | 'keep-local') => {
+      await provider.resolveSyncConflict?.(choice);
+    },
+    [provider],
+  );
+
+  const syncNow = useCallback(() => {
+    void provider.syncNow?.();
+  }, [provider]);
+
   const vaultStore = useMemo(
     () => (state.status === 'unlocked' ? provider.createVaultStore(state.session) : null),
     [provider, state],
@@ -213,6 +224,8 @@ export function AuthProvider({
         changePassword,
         deleteAccount,
         prepareKitRenewal,
+        resolveSyncConflict,
+        syncNow,
         getDataKey,
         getUserId,
         getDisplayName,

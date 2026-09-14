@@ -115,6 +115,7 @@ test.describe('Nuvem: conta, cofre e segundo aparelho', () => {
     await a.page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
     await a.page.getByRole('button', { name: /^entrar$/i }).click();
     await expect(a.page.getByText(/central financeira/i)).toBeVisible({ timeout: 20_000 });
-    await expect(a.page.getByRole('status').filter({ hasText: /sem sincronizar/i })).toBeVisible();
+    // supabase-js retries failed reads (1 s, 2 s, 4 s) before giving up.
+    await expect(a.page.getByRole('status').filter({ hasText: /sem sincronizar/i })).toBeVisible({ timeout: 25_000 });
   });
 });
