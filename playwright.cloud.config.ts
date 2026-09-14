@@ -14,8 +14,6 @@ export default defineConfig({
     baseURL: 'http://localhost:4174',
     headless: true,
     channel: process.env.PW_CHANNEL || undefined,
-    // index.html still has connect-src 'self'; the build-time CSP with the Supabase URL comes later.
-    bypassCSP: true,
   },
   webServer: {
     command: 'npx vite build --outDir dist-cloud-test --emptyOutDir && npx vite preview --outDir dist-cloud-test --port 4174 --strictPort',

@@ -1,4 +1,4 @@
-export { isCloudEnabled, isSecretSupabaseKey, readCloudConfig } from './env';
+export { connectSrcFor, isCloudEnabled, isSecretSupabaseKey, readCloudConfig } from './env';
 export type { CloudConfig, CloudEnv } from './env';
 
 /**
