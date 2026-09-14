@@ -1,66 +1,87 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { createLocalAuthProvider } from '../lib/auth';
-import type { AuthProvider as AuthProviderType, KitRenewal, UserAccount } from '../lib/auth';
-import type { VaultEnvelope } from '../lib/crypto';
+import { createAuthProvider } from '../lib/auth';
+import type { AuthProviderV2, KitRenewal, RegisterResult, UserAccount } from '../lib/auth';
 import { AuthCtx } from './AuthContext.shared';
 import type { AuthState } from './AuthContext.shared';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [provider] = useState<AuthProviderType>(() => createLocalAuthProvider());
+  const [provider] = useState<AuthProviderV2>(() => createAuthProvider());
   const [state, setState] = useState<AuthState>({ status: 'locked' });
-  const [users, setUsers] = useState<UserAccount[]>(() => provider.listUsers());
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const dataKeyRef = useRef<CryptoKey | null>(null);
 
-  const refreshUsers = useCallback(() => {
-    setUsers(provider.listUsers());
+  const refreshUsers = useCallback(async () => {
+    setUsers(await provider.listLocalAccounts());
+    setUsersLoaded(true);
   }, [provider]);
 
-  const register = useCallback(async (displayName: string, password: string) => {
-    const session = await provider.register(displayName, password);
-    dataKeyRef.current = session.dataKey;
-    setState({ status: 'unlocked', session });
-    refreshUsers();
+  useEffect(() => {
+    let cancelled = false;
+    provider.listLocalAccounts().then(
+      list => {
+        if (cancelled) return;
+        setUsers(list);
+        setUsersLoaded(true);
+      },
+      () => {
+        if (cancelled) return;
+        setUsers([]);
+        setUsersLoaded(true);
+      },
+    );
+    return () => { cancelled = true; };
+  }, [provider]);
+
+  const lock = useCallback(() => {
+    dataKeyRef.current = null;
+    void provider.signOut();
+    setState({ status: 'locked' });
+  }, [provider]);
+
+  const register = useCallback(async (displayName: string, password: string): Promise<RegisterResult> => {
+    const result = await provider.register({ displayName, password });
+    await refreshUsers();
+    return result;
   }, [provider, refreshUsers]);
 
   const signIn = useCallback(async (userId: string, password: string) => {
-    const session = await provider.signIn(userId, password);
+    const { session } = await provider.signIn({ userId, password });
     dataKeyRef.current = session.dataKey;
     setState({ status: 'unlocked', session });
   }, [provider]);
 
   const signOut = useCallback(() => {
-    dataKeyRef.current = null;
-    provider.signOut();
-    setState({ status: 'locked' });
-  }, [provider]);
+    lock();
+  }, [lock]);
 
   const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
     if (state.status !== 'unlocked') throw new Error('Sessão expirada.');
-    await provider.changePassword(state.session.userId, oldPassword, newPassword);
-    // Re-sign-in to get fresh data key from new envelope
-    const session = await provider.signIn(state.session.userId, newPassword);
+    const session = await provider.changePassword(oldPassword, newPassword);
     dataKeyRef.current = session.dataKey;
     setState({ status: 'unlocked', session });
-  }, [provider, state]);
+    await refreshUsers();
+  }, [provider, state, refreshUsers]);
 
   const deleteAccount = useCallback(async (password: string) => {
     if (state.status !== 'unlocked') throw new Error('Sessão expirada.');
-    await provider.deleteAccount(state.session.userId, password);
+    await provider.deleteLocalAccount(state.session.userId, password);
     dataKeyRef.current = null;
     setState({ status: 'locked' });
-    refreshUsers();
+    await refreshUsers();
   }, [provider, state, refreshUsers]);
 
   const prepareKitRenewal = useCallback(async (password: string): Promise<KitRenewal> => {
     if (state.status !== 'unlocked') throw new Error('Sessão expirada.');
     const session = state.session;
-    const renewal = await provider.prepareKitRenewal(session.userId, password);
+    const renewal = await provider.prepareKitRenewal(password);
     return {
       ...renewal,
       commit: async () => {
@@ -71,11 +92,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           dataKeyRef.current = dataKey;
           setState({ status: 'unlocked', session: { ...session, dataKey } });
         }
-        refreshUsers();
+        await refreshUsers();
         return dataKey;
       },
     };
   }, [provider, state, refreshUsers]);
+
+  const vaultStore = useMemo(
+    () => (state.status === 'unlocked' ? provider.createVaultStore(state.session) : null),
+    [provider, state],
+  );
 
   const getDataKey = useCallback(() => dataKeyRef.current, []);
 
@@ -92,17 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const getEnvelope = useCallback(
     () => {
       if (state.status !== 'unlocked') return null;
-      return provider.getEnvelope(state.session.userId);
+      return users.find(user => user.id === state.session.userId)?.envelope ?? null;
     },
-    [provider, state],
-  );
-
-  const updateEnvelope = useCallback(
-    (envelope: VaultEnvelope) => {
-      if (state.status !== 'unlocked') return;
-      provider.updateEnvelope(state.session.userId, envelope);
-    },
-    [provider, state],
+    [state, users],
   );
 
   // Auto-lock on page unload
@@ -118,20 +136,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.status !== 'unlocked') return;
     const { userId } = state.session;
-    const snapshot = JSON.stringify(provider.getEnvelope(userId));
+    let snapshot: string | null = null;
+    let active = true;
+
+    const envelopeOf = async () =>
+      JSON.stringify((await provider.listLocalAccounts()).find(user => user.id === userId)?.envelope ?? null);
+
+    envelopeOf().then(value => { snapshot = value; });
 
     function handleStorage(event: StorageEvent) {
       if (event.storageArea !== localStorage) return;
-      if (JSON.stringify(provider.getEnvelope(userId)) === snapshot) return;
-      dataKeyRef.current = null;
-      provider.signOut();
-      setState({ status: 'locked' });
-      refreshUsers();
+      envelopeOf().then(current => {
+        if (!active || snapshot === null || current === snapshot) return;
+        lock();
+        void refreshUsers();
+      });
     }
 
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [state, provider, refreshUsers]);
+    return () => {
+      active = false;
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [state, provider, lock, refreshUsers]);
 
   // Auto-lock after 15 minutes of inactivity
   useEffect(() => {
@@ -142,11 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     function resetTimer() {
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        dataKeyRef.current = null;
-        provider.signOut();
-        setState({ status: 'locked' });
-      }, IDLE_MS);
+      timer = setTimeout(lock, IDLE_MS);
     }
 
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const;
@@ -157,14 +180,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       for (const evt of events) window.removeEventListener(evt, resetTimer);
     };
-  }, [state.status, provider]);
+  }, [state.status, lock]);
 
   return (
     <AuthCtx.Provider
       value={{
         state,
+        mode: provider.mode,
         users,
+        usersLoaded,
         provider,
+        vaultStore,
         register,
         signIn,
         signOut,
@@ -175,7 +201,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getUserId,
         getDisplayName,
         getEnvelope,
-        updateEnvelope,
         refreshUsers,
       }}
     >
