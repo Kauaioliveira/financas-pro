@@ -1,7 +1,28 @@
 import { defineConfig, loadEnv } from 'vite'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { readCloudConfig } from './src/lib/cloud/env'
+import { connectSrcFor, readCloudConfig } from './src/lib/cloud/env'
+import type { CloudConfig } from './src/lib/cloud/env'
+
+const CONNECT_SRC_PLACEHOLDER = '__CSP_CONNECT_SRC__'
+
+/**
+ * Fills connect-src of the CSP <meta> in index.html (dev and build): 'self' in local
+ * builds, plus the Supabase origin in cloud builds. Vite's %VITE_*% syntax is not used
+ * because a missing variable would stay in the page as literal text.
+ */
+function cspConnectSrc(cloud: CloudConfig | null): Plugin {
+  return {
+    name: 'financaspro-csp-connect-src',
+    transformIndexHtml(html) {
+      if (!html.includes(CONNECT_SRC_PLACEHOLDER)) {
+        throw new Error(`index.html precisa de connect-src ${CONNECT_SRC_PLACEHOLDER} no Content-Security-Policy.`)
+      }
+      return html.replaceAll(CONNECT_SRC_PLACEHOLDER, connectSrcFor(cloud))
+    },
+  }
+}
 
 export default defineConfig(({ mode }) => {
   // Throws on unsafe values (e.g. a secret key), so a broken deploy fails at build time.
@@ -10,7 +31,7 @@ export default defineConfig(({ mode }) => {
   return {
     // false turns every cloud branch into dead code, so the local bundle has no cloud modules.
     define: { __FINANCASPRO_CLOUD__: JSON.stringify(cloud !== null) },
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), cspConnectSrc(cloud)],
     build: {
       rollupOptions: {
         output: {

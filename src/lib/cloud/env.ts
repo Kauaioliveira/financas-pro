@@ -75,6 +75,14 @@ export function readCloudConfig(env: CloudEnv): CloudConfig | null {
   return { url: parsed.origin, anonKey };
 }
 
+/**
+ * connect-src of the Content-Security-Policy: only this site, plus the Supabase
+ * project origin in cloud builds. No wildcard and no wss: (Realtime is not used).
+ */
+export function connectSrcFor(config: CloudConfig | null): string {
+  return config ? `'self' ${config.url}` : `'self'`;
+}
+
 /** Cloud mode needs both public variables and must not be forced local. */
 export function isCloudEnabled(env: CloudEnv): boolean {
   try {

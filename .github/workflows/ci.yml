@@ -29,6 +29,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # CI builds without Supabase variables: the bundle must have no secret keys and no cloud code.
+      - name: Guard the local bundle
+        run: npm run check:bundle -- --expect-local
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 

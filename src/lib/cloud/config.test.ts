@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloudEnabled, isCloudEnabled, isSecretSupabaseKey, readCloudConfig } from './config';
+import { cloudEnabled, connectSrcFor, isCloudEnabled, isSecretSupabaseKey, readCloudConfig } from './config';
 
 const URL = 'https://abcd1234.supabase.co';
 const KEY = 'sb_publishable_abc';
@@ -60,5 +60,13 @@ describe('readCloudConfig', () => {
     expect(
       readCloudConfig({ VITE_SUPABASE_URL: 'http://127.0.0.1:54321', VITE_SUPABASE_ANON_KEY: KEY })?.url,
     ).toBe('http://127.0.0.1:54321');
+  });
+});
+
+describe('connectSrcFor', () => {
+  it("stays 'self' in local builds and adds only the project origin in cloud builds", () => {
+    expect(connectSrcFor(null)).toBe("'self'");
+    const config = readCloudConfig({ VITE_SUPABASE_URL: `${URL}/rest/v1`, VITE_SUPABASE_ANON_KEY: KEY });
+    expect(connectSrcFor(config)).toBe(`'self' ${URL}`);
   });
 });
