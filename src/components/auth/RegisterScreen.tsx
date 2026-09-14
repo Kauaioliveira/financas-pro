@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import { Wallet, Eye, EyeOff, UserPlus, Loader2, ArrowLeft, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { readLegacyData, clearLegacyData } from '../../utils/secureStorage';
+import { migrateLegacyData } from '../../lib/vault';
 import { KitWordConfirmation, RecoveryKitSheet } from './RecoveryKit';
 
 const CTA_GRADIENT = 'linear-gradient(135deg, #22d3ee, #3b82f6)';
@@ -28,6 +28,7 @@ export function RegisterScreen({
   const [kit, setKit] = useState<{ phrase: string; kitId: string; createdAt: string } | null>(null);
   const [createdUserId, setCreatedUserId] = useState('');
   const [unlocking, setUnlocking] = useState(false);
+  const [legacyWarning, setLegacyWarning] = useState('');
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -44,11 +45,20 @@ export function RegisterScreen({
       setCreatedUserId(session.userId);
       setKit({ phrase: createdKit.phrase, kitId: createdKit.kitId, createdAt: createdKit.kitCreatedAt });
 
-      // Migrate legacy plaintext data if present
+      // Migrate legacy plaintext data if present. The account already exists here,
+      // so a failure must not abort the kit step, and the plaintext stays untouched.
       if (hasLegacyData) {
-        const legacyData = readLegacyData();
-        await provider.createVaultStore(session).save(legacyData);
-        clearLegacyData();
+        try {
+          const { kept } = await migrateLegacyData(provider.createVaultStore(session));
+          if (kept.length > 0) {
+            setLegacyWarning('Parte dos dados antigos estava ilegível e foi mantida neste aparelho, sem alteração.');
+          }
+        } catch (err) {
+          const reason = err instanceof Error ? ` ${err.message}` : '';
+          setLegacyWarning(
+            `Não foi possível cifrar os dados antigos.${reason} Eles continuam neste aparelho, sem alteração.`,
+          );
+        }
       }
 
       setStep('kit');
@@ -91,6 +101,12 @@ export function RegisterScreen({
                 </p>
               </div>
             </div>
+
+            {legacyWarning && (
+              <p role="alert" className="mt-4 rounded-xl bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
+                {legacyWarning}
+              </p>
+            )}
 
             {step === 'kit' ? (
               <>

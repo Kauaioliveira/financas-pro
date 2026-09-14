@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptData, generateDataKeyAsync } from '../lib/crypto/crypto';
 import {
   clearLegacyData,
@@ -8,6 +8,10 @@ import {
   readLegacyData,
   saveVaultData,
   LEGACY_KEYS,
+  VaultLoadError,
+  VaultSaveError,
+  listUnreadableVaultCopies,
+  preserveUnreadableVault,
 } from './secureStorage';
 
 describe('loadVaultData / saveVaultData', () => {
@@ -30,38 +34,50 @@ describe('loadVaultData / saveVaultData', () => {
     expect(await loadVaultData('nonexistent-user', dataKey)).toEqual({});
   });
 
-  it('returns an empty object when the stored ciphertext is corrupt', async () => {
+  it('throws VaultLoadError (not {}) when the stored ciphertext is corrupt', async () => {
     const dataKey = await generateDataKeyAsync();
     localStorage.setItem('financaspro_user-1_vault', 'not valid encrypted payload json');
-    expect(await loadVaultData('user-1', dataKey)).toEqual({});
+    await expect(loadVaultData('user-1', dataKey)).rejects.toMatchObject({
+      name: 'VaultLoadError',
+      reason: 'decrypt',
+    });
   });
 
-  it('returns an empty object when decryption fails (wrong key)', async () => {
+  it('throws VaultLoadError when decryption fails (wrong key) and leaves the vault intact', async () => {
     const dataKey = await generateDataKeyAsync();
     const wrongKey = await generateDataKeyAsync();
     await saveVaultData('user-1', dataKey, { secret: true });
-    expect(await loadVaultData('user-1', wrongKey)).toEqual({});
+    const before = localStorage.getItem('financaspro_user-1_vault');
+
+    await expect(loadVaultData('user-1', wrongKey)).rejects.toBeInstanceOf(VaultLoadError);
+    expect(localStorage.getItem('financaspro_user-1_vault')).toBe(before);
+    expect(await loadVaultData('user-1', dataKey)).toEqual({ secret: true });
   });
 
-  it('returns an empty object when the decrypted JSON is a primitive (number/string/null)', async () => {
+  it('throws when the decrypted content is not JSON', async () => {
     const dataKey = await generateDataKeyAsync();
-    // saveVaultData always JSON.stringifies an object, so we bypass it here by
-    // encrypting a non-object payload directly through the same encryption used internally.
-    for (const primitiveJson of ['42', '"a string"', 'null']) {
-      const encrypted = await encryptData(dataKey, primitiveJson);
-      localStorage.setItem('financaspro_user-1_vault', encrypted);
-      expect(await loadVaultData('user-1', dataKey)).toEqual({});
+    localStorage.setItem('financaspro_user-1_vault', await encryptData(dataKey, '{not json'));
+    await expect(loadVaultData('user-1', dataKey)).rejects.toMatchObject({ reason: 'invalid-json' });
+  });
+
+  it('throws when the decrypted JSON is not an object (primitive, null or array)', async () => {
+    const dataKey = await generateDataKeyAsync();
+    for (const json of ['42', '"a string"', 'null', '[1,2,3]']) {
+      localStorage.setItem('financaspro_user-1_vault', await encryptData(dataKey, json));
+      await expect(loadVaultData('user-1', dataKey)).rejects.toMatchObject({ reason: 'invalid-shape' });
     }
   });
 
-  it('passes an array through unchanged, since the guard only checks typeof === "object" (arrays qualify)', async () => {
+  it('throws VaultLoadError when storage cannot be read', async () => {
     const dataKey = await generateDataKeyAsync();
-    const encrypted = await encryptData(dataKey, JSON.stringify([1, 2, 3]));
-    localStorage.setItem('financaspro_user-1_vault', encrypted);
-
-    // This documents actual behavior: `typeof [] === 'object'` so the defensive
-    // check `typeof parsed === 'object' && parsed !== null` does not catch arrays.
-    expect(await loadVaultData('user-1', dataKey)).toEqual([1, 2, 3]);
+    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    try {
+      await expect(loadVaultData('user-1', dataKey)).rejects.toMatchObject({ reason: 'read' });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('scopes vault storage per user id', async () => {
@@ -74,6 +90,78 @@ describe('loadVaultData / saveVaultData', () => {
   });
 });
 
+describe('saveVaultData errors', () => {
+  it('propagates a full storage as a quota VaultSaveError and keeps the previous vault', async () => {
+    const dataKey = await generateDataKeyAsync();
+    await saveVaultData('user-1', dataKey, { version: 1 });
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    try {
+      const error = await saveVaultData('user-1', dataKey, { version: 2 }).catch(e => e);
+      expect(error).toBeInstanceOf(VaultSaveError);
+      expect(error.reason).toBe('quota');
+      expect(error.message).toMatch(/exporte um backup/i);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await loadVaultData('user-1', dataKey)).toEqual({ version: 1 });
+  });
+
+  it('propagates other write errors as write VaultSaveError', async () => {
+    const dataKey = await generateDataKeyAsync();
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('boom');
+    });
+    try {
+      await expect(saveVaultData('user-1', dataKey, {})).rejects.toMatchObject({ reason: 'write' });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not write when beforeWrite throws', async () => {
+    const dataKey = await generateDataKeyAsync();
+    await saveVaultData('user-1', dataKey, { version: 1 });
+    await expect(
+      saveVaultData('user-1', dataKey, { version: 2 }, {
+        beforeWrite: () => {
+          throw new VaultSaveError('stale-key', 'stale');
+        },
+      }),
+    ).rejects.toMatchObject({ reason: 'stale-key' });
+    expect(await loadVaultData('user-1', dataKey)).toEqual({ version: 1 });
+  });
+});
+
+describe('preserveUnreadableVault', () => {
+  it('copies the raw vault to a side key', () => {
+    localStorage.setItem('financaspro_user-1_vault', 'raw-ciphertext');
+    const key = preserveUnreadableVault('user-1', new Date(1_700_000_000_000));
+    expect(key).toBe('financaspro_user-1_vault_unreadable_1700000000000');
+    expect(localStorage.getItem(key!)).toBe('raw-ciphertext');
+    expect(listUnreadableVaultCopies('user-1')).toEqual([key]);
+  });
+
+  it('returns null when there is no vault (edge)', () => {
+    expect(preserveUnreadableVault('user-1')).toBeNull();
+  });
+
+  it('throws and changes nothing when the copy cannot be written', () => {
+    localStorage.setItem('financaspro_user-1_vault', 'raw-ciphertext');
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    try {
+      expect(() => preserveUnreadableVault('user-1')).toThrow(/nada foi alterado/i);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(localStorage.getItem('financaspro_user-1_vault')).toBe('raw-ciphertext');
+    expect(listUnreadableVaultCopies('user-1')).toEqual([]);
+  });
+});
+
 describe('deleteVaultData', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -82,8 +170,10 @@ describe('deleteVaultData', () => {
   it('removes the vault entry for the given user', async () => {
     const dataKey = await generateDataKeyAsync();
     await saveVaultData('user-1', dataKey, { a: 1 });
+    preserveUnreadableVault('user-1');
     deleteVaultData('user-1');
     expect(await loadVaultData('user-1', dataKey)).toEqual({});
+    expect(listUnreadableVaultCopies('user-1')).toEqual([]);
   });
 });
 

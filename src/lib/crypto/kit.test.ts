@@ -15,8 +15,10 @@ import {
   generateDataKeyAsync,
   recoverWithPhrase,
   rotateVaultKey,
+  unlockRecoveryWrap,
   unlockVault,
 } from './crypto';
+import { LEGACY_KIT_ITERATIONS } from './constants';
 
 vi.mock('./constants', async importOriginal => ({
   ...(await importOriginal<typeof import('./constants')>()),
@@ -89,6 +91,40 @@ describe('createRecoveryKitWrap / addRecoveryWrap', () => {
     expect(recovered.kitId).toBe(withKit.kitId);
     expect(recovered.kitCreatedAt).toBe(withKit.kitCreatedAt);
   });
+});
+
+describe('kit iteration count', () => {
+  it('is recorded in every new wrap and used to open it', async () => {
+    const dataKey = await generateDataKeyAsync();
+    const wrap = await createRecoveryKitWrap(PHRASE, dataKey, new Date(), 2_000);
+    expect(wrap.recoveryIterations).toBe(2_000);
+    await expect(unlockRecoveryWrap(PHRASE, wrap)).resolves.toBeDefined();
+    // The wrong count is a wrong key: proves the recorded value is what opens it.
+    await expect(unlockRecoveryWrap(PHRASE, { ...wrap, recoveryIterations: 1_000 })).rejects.toThrow(
+      'Frase de recuperação incorreta.',
+    );
+  });
+
+  it('defaults to the current local count and survives recovery and password change', async () => {
+    const { envelope, dataKey } = await createVaultEnvelope('senha123');
+    const withKit = await addRecoveryWrap(PHRASE, dataKey, envelope);
+    expect(withKit.recoveryIterations).toBe(1_000); // PBKDF2_ITERATIONS is mocked in this file
+    const recovered = await recoverWithPhrase(PHRASE, 'novaSenha1', withKit);
+    expect(recovered.recoveryIterations).toBe(1_000);
+  });
+
+  it('opens kits without the field with the legacy 310k count (edge: accounts before this change)', async () => {
+    expect(LEGACY_KIT_ITERATIONS).toBe(310_000);
+    const dataKey = await generateDataKeyAsync();
+    const { recoveryIterations, ...oldWrap } = await createRecoveryKitWrap(
+      PHRASE,
+      dataKey,
+      new Date(),
+      LEGACY_KIT_ITERATIONS,
+    );
+    expect(recoveryIterations).toBe(LEGACY_KIT_ITERATIONS);
+    await expect(unlockRecoveryWrap(PHRASE, oldWrap)).resolves.toBeDefined();
+  }, 30_000);
 });
 
 describe('rotateVaultKey', () => {

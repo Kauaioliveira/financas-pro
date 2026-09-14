@@ -46,6 +46,16 @@ describe('backup v2', () => {
     expect(await importBackupV2(file, { kind: 'kit', phrase: PHRASE })).toEqual(DATA);
   });
 
+  it('records the kit iteration count of the account in the file', async () => {
+    const { envelope, dataKey } = await accountWithKit();
+    const file = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, envelope));
+    expect(file.wraps.kit.iterations).toBe(envelope.recoveryIterations);
+    const { recoveryIterations: _ignored, ...oldEnvelope } = envelope;
+    void _ignored;
+    const oldFile = JSON.parse(await exportBackupV2(JSON.stringify(DATA), dataKey, oldEnvelope));
+    expect(oldFile.wraps.kit.iterations).toBe(310_000);
+  });
+
   it('opens with the account password', async () => {
     const { envelope, dataKey } = await accountWithKit();
     const file = await exportBackupV2(JSON.stringify(DATA), dataKey, envelope);
