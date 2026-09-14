@@ -111,19 +111,16 @@ test.describe('Smoke — backup', () => {
     await expect(page.getByRole('button', { name: /restaurar backup/i })).toBeVisible();
   });
 
-  test('iniciar fluxo de exportacao e preencher senha', async ({ page }) => {
+  test('exportar backup sem senha separada', async ({ page }) => {
     await page.getByTitle('Configurações').click();
-    await page.getByRole('button', { name: /exportar backup/i }).click();
-
-    await expect(page.getByPlaceholder(/senha do backup/i)).toBeVisible();
-    await page.getByPlaceholder(/senha do backup/i).fill('test1234');
-    await page.getByPlaceholder(/confirmar senha/i).fill('test1234');
+    await expect(page.getByText(/abre com o kit de recupera/i)).toBeVisible();
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: /^exportar$/i }).click(),
+      page.getByRole('button', { name: /exportar backup/i }).click(),
     ]);
 
     expect(download.suggestedFilename()).toMatch(/\.financas\.enc$/);
+    await expect(page.getByText(/backup cifrado exportado/i)).toBeVisible();
   });
 });

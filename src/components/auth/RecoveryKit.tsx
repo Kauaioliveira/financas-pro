@@ -150,7 +150,14 @@ export function RecoveryKitSheet({
               Guarde este papel longe do computador. Não fotografe e não salve em nuvem, e-mail ou
               mensagens.
             </li>
-            <li>Quem tiver estas palavras e acesso ao seu computador consegue ver seus dados.</li>
+            <li>
+              As palavras também abrem os backups (.financas.enc) exportados enquanto este kit
+              estava ativo.
+            </li>
+            <li>
+              Quem tiver estas palavras e acesso ao seu computador ou a um backup consegue ver seus
+              dados.
+            </li>
             <li>
               Se você gerar um kit novo em Configurações, este kit (id {kitId}) deixa de abrir a
               conta.

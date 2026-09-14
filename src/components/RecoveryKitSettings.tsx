@@ -115,7 +115,7 @@ export function RecoveryKitSettings() {
             ) : (
               'O kit anterior não abre mais a sua conta.'
             )}{' '}
-            Backups exportados antes desta data continuam abrindo com a senha do backup.
+            Backups exportados antes desta data continuam abrindo com o kit e a senha da época.
           </p>
         </div>
       )}

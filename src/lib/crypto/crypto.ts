@@ -284,6 +284,31 @@ export async function rotateVaultKey(
   };
 }
 
+/**
+ * Opens a recovery wrap and returns the data key. Recovery wraps never stored
+ * their iteration count, so it defaults to the count local accounts always used.
+ */
+export async function unlockRecoveryWrap(
+  recoveryPhrase: string,
+  wrap: Pick<RecoveryKitWrap, 'recoveryWrap' | 'recoveryWrapIv' | 'recoverySalt'>,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<CryptoKey> {
+  const { authKeyRaw } = await deriveAuthAndVerifier(
+    recoveryPhrase,
+    fromBase64(wrap.recoverySalt),
+    iterations,
+  );
+  try {
+    return await unwrapDataKey(
+      authKeyRaw,
+      fromBase64(wrap.recoveryWrap),
+      fromBase64(wrap.recoveryWrapIv),
+    );
+  } catch {
+    throw new Error('Frase de recuperação incorreta.');
+  }
+}
+
 export async function recoverWithPhrase(
   recoveryPhrase: string,
   newPassword: string,
@@ -293,19 +318,11 @@ export async function recoverWithPhrase(
     throw new Error('Esta conta não possui frase de recuperação configurada.');
   }
 
-  const recoverySalt = fromBase64(envelope.recoverySalt);
-  const { authKeyRaw } = await deriveAuthAndVerifier(recoveryPhrase, recoverySalt);
-
-  let dataKey: CryptoKey;
-  try {
-    dataKey = await unwrapDataKey(
-      authKeyRaw,
-      fromBase64(envelope.recoveryWrap),
-      fromBase64(envelope.recoveryWrapIv),
-    );
-  } catch {
-    throw new Error('Frase de recuperação incorreta.');
-  }
+  const dataKey = await unlockRecoveryWrap(recoveryPhrase, {
+    recoveryWrap: envelope.recoveryWrap,
+    recoveryWrapIv: envelope.recoveryWrapIv,
+    recoverySalt: envelope.recoverySalt,
+  });
 
   const newSalt = getRandomBytes(SALT_BYTES);
   const { authKeyRaw: newAuthKeyRaw, verifier: newVerifier } = await deriveAuthAndVerifier(
