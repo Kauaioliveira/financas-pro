@@ -50,7 +50,8 @@ export class MockSupabase {
   online = true;
   /** Devices (browser contexts) without internet; the others keep working. */
   offline = new Set<BrowserContext>();
-  resetRequests: Array<{ email: string; redirectTo: string | null }> = [];
+  /** Reset e-mails "sent": link is what the user would click. */
+  resetRequests: Array<{ email: string; redirectTo: string | null; challenge: string | null; code: string; link: string }> = [];
   unexpected: string[] = [];
   private seq = 1;
 
@@ -179,8 +180,29 @@ export class MockSupabase {
     }
     if (path === '/auth/v1/logout') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } });
     if (path === '/auth/v1/recover' && method === 'POST') {
-      this.resetRequests.push({ email: String(body.email).toLowerCase(), redirectTo: url.searchParams.get('redirect_to') });
+      const redirectTo = url.searchParams.get('redirect_to');
+      const code = crypto.randomUUID();
+      const base = redirectTo ?? 'http://localhost:4174/';
+      this.resetRequests.push({
+        email: String(body.email).toLowerCase(),
+        redirectTo,
+        challenge: body.code_challenge ?? null,
+        code,
+        link: `${base}${base.includes('?') ? '&' : '?'}code=${code}`,
+      });
       return json(200, {});
+    }
+    if (path === '/auth/v1/token' && url.searchParams.get('grant_type') === 'pkce') {
+      const request = this.resetRequests.find(r => r.code === body.auth_code);
+      const verifier = String(body.code_verifier ?? '');
+      const challenge = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))).toString('base64url');
+      if (!request || !request.challenge || challenge !== request.challenge) {
+        return authError(400, 'flow_state_not_found', 'invalid flow state, no valid flow state found');
+      }
+      const user = this.users.get(request.email);
+      if (!user) return authError(400, 'user_not_found', 'User not found');
+      request.challenge = null; // one-time code
+      return json(200, this.session(user));
     }
     if (path === '/auth/v1/user') {
       const user = this.userFromAuth(route);

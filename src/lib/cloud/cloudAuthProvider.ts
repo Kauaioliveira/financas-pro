@@ -18,7 +18,7 @@ import type {
   UserAccount,
 } from '../auth/types';
 import type { VaultData, VaultStore } from '../vault';
-import type { CloudBackend, CloudUser, VaultRow } from './backend';
+import type { AccountKdf, CloudBackend, CloudUser, KitWrap, PasswordWrap, VaultRow } from './backend';
 import { createCloudVaultStore } from './cloudVaultStore';
 import { CloudError, isCloudError } from './errors';
 import { checkCloudPassword } from './passwordPolicy';
@@ -41,6 +41,7 @@ import {
   createKitWrap,
   decryptVault,
   encryptVault,
+  openKitWrap,
   openPasswordWrap,
 } from './vaultCrypto';
 
@@ -49,7 +50,25 @@ export interface CloudStart {
   email: string;
   /** A login session exists in this browser (keys still need the password). */
   hasSession: boolean;
+  /** The page was opened from a password reset link: ask for the new password. */
+  passwordRecovery: boolean;
 }
+
+/** Result of opening the data with the kit or the old password. */
+export type RecoveryResult =
+  | {
+      status: 'unlocked';
+      session: AuthSession;
+      /** The key wraps in the cloud had been replaced and were restored from the key history. */
+      restoredKeys: boolean;
+    }
+  | {
+      /** The kit opens keys from an earlier time; only data from then can be read. */
+      status: 'old-version';
+      createdAt: string;
+      /** Replaces the cloud data with that earlier version and opens it. */
+      commit(): Promise<AuthSession>;
+    };
 
 export interface CloudSignUpInput {
   displayName: string;
@@ -76,6 +95,21 @@ export interface CloudAuthProvider extends Omit<AuthProviderV2, 'mode'> {
   prepareVaultSetup(): Promise<VaultSetup>;
   getSyncStatus(): SyncStatus;
   subscribeSync(listener: (status: SyncStatus) => void): () => void;
+  /** Called when a password reset link was opened in this browser. */
+  subscribeRecovery(listener: () => void): () => void;
+  /** Sends the reset e-mail. Resolves the same way whether or not the e-mail exists. */
+  requestPasswordReset(email: string): Promise<void>;
+  /** After the reset link: sets the new login secret only. The data key wrap is untouched. */
+  completePasswordReset(newPassword: string): Promise<SignInResult>;
+  /** Requires needs-kit. Tries the current kit wrap, then the key history. */
+  unlockWithKit(phrase: string): Promise<RecoveryResult>;
+  /** Requires needs-kit. "Lembrei a senha antiga". */
+  unlockWithOldPassword(oldPassword: string): Promise<RecoveryResult>;
+  /**
+   * Requires needs-kit. New data key and kit that replace the cloud data: restore a
+   * backup or start from zero. The old data stays encrypted and unreadable.
+   */
+  prepareFreshKeys(): Promise<VaultSetup>;
 }
 
 export interface CloudAuthProviderOptions {
@@ -98,6 +132,7 @@ interface Current {
 }
 
 const NOT_AVAILABLE = 'Esta ação não existe no modo nuvem.';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The browser knows it has no connection: skip calls that would only wait for retries. */
 function browserOffline(): boolean {
@@ -116,6 +151,14 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
   const remoteListeners = new Set<() => void>();
   let engine: SyncEngine | null = null;
   let detachTriggers: () => void = () => {};
+  let recoveryUser: CloudUser | null = null;
+  const recoveryListeners = new Set<() => void>();
+
+  backend.onAuthEvent(event => {
+    if (event.type !== 'password-recovery') return;
+    recoveryUser = event.user;
+    for (const listener of recoveryListeners) listener();
+  });
 
   function startEngine(userId: string, dataKey: CryptoKey): void {
     stopEngine();
@@ -288,6 +331,116 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     return { status: 'unlocked', session: open(next, dataKey, statusFor(next, false)) };
   }
 
+  function requireKitStep(): Pending & { row: VaultRow } {
+    if (!pending?.row) throw new Error('Entre de novo para abrir os dados.');
+    return pending as Pending & { row: VaultRow };
+  }
+
+  interface KeyCandidate {
+    kdf: AccountKdf;
+    pwWrap: PasswordWrap;
+    kitWrap: KitWrap | null;
+    current: boolean;
+  }
+
+  /** Current wraps first, then the key history (most recent first). */
+  async function keyCandidates(row: VaultRow): Promise<KeyCandidate[]> {
+    const history = await backend.fetchKeyHistory();
+    return [
+      { kdf: row.kdf, pwWrap: row.pwWrap, kitWrap: row.kitWrap, current: true },
+      ...history.map(h => ({ kdf: h.kdf, pwWrap: h.pwWrap, kitWrap: h.kitWrap, current: false })),
+    ];
+  }
+
+  /**
+   * Makes the recovered data key open with the current password again. Uses
+   * set_password_wrap when only the password wrap changes, and rotate_vault_keys
+   * (restored kit wrap, chosen ciphertext) when more must change, in one versioned update.
+   */
+  async function rewrap(
+    step: Pending & { row: VaultRow },
+    dataKey: CryptoKey,
+    kitWrap: KitWrap | null,
+    ciphertext: string,
+    onlyPassword: boolean,
+  ): Promise<void> {
+    const pwWrap = await wrapKeyWith(step.keys.pwWrapKey, dataKey);
+    const latest = (await backend.fetchVault()) ?? step.row;
+    let ok: number | null;
+    if (onlyPassword || !kitWrap) {
+      ok = await backend.setPasswordWrap(latest.keysVersion, accountKdf(), pwWrap);
+      if (ok !== null && ciphertext !== latest.ciphertext) {
+        ok = await backend.saveVault(latest.version, ciphertext, getDeviceId());
+      }
+    } else {
+      ok = await backend.rotateVaultKeys(latest.version, accountKdf(), pwWrap, kitWrap, ciphertext);
+    }
+    if (ok === null) {
+      throw new Error('A conta mudou em outro aparelho enquanto os dados eram abertos. Nada foi perdido: tente de novo.');
+    }
+  }
+
+  async function reopenAfterRecovery(step: Pending): Promise<AuthSession> {
+    const result = await openFromCloud(step.email, step.keys, step.user, cacheForEmail(step.email));
+    if (result.status !== 'unlocked') {
+      throw new Error('Não foi possível abrir os dados depois da recuperação. Tente entrar de novo.');
+    }
+    return result.session;
+  }
+
+  /** Shared by the kit and the old password: find a key that opens, then data that key opens. */
+  async function recover(
+    open: (candidate: KeyCandidate) => Promise<CryptoKey | null>,
+    isKit: boolean,
+  ): Promise<RecoveryResult> {
+    const step = requireKitStep();
+    const row = (await backend.fetchVault()) ?? step.row;
+    step.row = row;
+    let openedWithoutData = false;
+    const tried = new Set<string>();
+
+    for (const candidate of await keyCandidates(row)) {
+      const wrap = isKit ? candidate.kitWrap?.wrapped : candidate.pwWrap.wrapped;
+      if (!wrap || tried.has(wrap)) continue; // password changes repeat the same kit wrap
+      tried.add(wrap);
+      const dataKey = await open(candidate);
+      if (!dataKey) continue;
+
+      // A kit that opens proves its wrap is good; a password does not vouch for the kit.
+      const kitWrap = isKit ? candidate.kitWrap : candidate.current ? row.kitWrap : (candidate.kitWrap ?? row.kitWrap);
+
+      if (await canDecryptVault(dataKey, row.ciphertext)) {
+        await rewrap(step, dataKey, kitWrap, row.ciphertext, candidate.current && isKit);
+        return { status: 'unlocked', session: await reopenAfterRecovery(step), restoredKeys: !candidate.current };
+      }
+
+      for (const copy of await backend.fetchVaultHistory()) {
+        if (!(await canDecryptVault(dataKey, copy.ciphertext))) continue;
+        let committed = false;
+        return {
+          status: 'old-version',
+          createdAt: copy.createdAt,
+          async commit() {
+            if (committed) throw new Error('Esta versão já foi restaurada.');
+            await rewrap(step, dataKey, kitWrap, copy.ciphertext, false);
+            committed = true;
+            return reopenAfterRecovery(step);
+          },
+        };
+      }
+      openedWithoutData = true;
+    }
+
+    if (openedWithoutData) {
+      throw new Error(
+        isKit
+          ? 'Este kit abre uma versão antiga das chaves, mas não há mais dados daquela época na nuvem. Use um kit mais novo ou restaure um backup.'
+          : 'Esta senha abre uma versão antiga das chaves, mas não há mais dados daquela época na nuvem. Use o kit ou restaure um backup.',
+      );
+    }
+    throw new Error(isKit ? 'Kit de recuperação incorreto.' : 'Essa não é a senha antiga desta conta.');
+  }
+
   const provider: CloudAuthProvider = {
     mode: 'cloud',
 
@@ -302,13 +455,17 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
       } catch {
         user = null;
       }
-      return { email: user?.email ?? lastCloudEmail(), hasSession: user !== null };
+      return {
+        email: recoveryUser?.email ?? user?.email ?? lastCloudEmail(),
+        hasSession: user !== null,
+        passwordRecovery: recoveryUser !== null,
+      };
     },
 
     async signUp({ displayName, email, password }) {
       const emailNorm = normalizeEmail(email);
       if (!displayName.trim()) throw new Error('Digite seu nome.');
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) throw new Error('Digite um e-mail válido.');
+      if (!EMAIL_PATTERN.test(emailNorm)) throw new Error('Digite um e-mail válido.');
       const rule = checkCloudPassword(password, emailNorm);
       if (rule) throw new Error(rule);
 
@@ -599,6 +756,79 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
       } catch {
         return null;
       }
+    },
+
+    subscribeRecovery(listener) {
+      recoveryListeners.add(listener);
+      return () => {
+        recoveryListeners.delete(listener);
+      };
+    },
+
+    async requestPasswordReset(email) {
+      const emailNorm = normalizeEmail(email);
+      if (!EMAIL_PATTERN.test(emailNorm)) throw new Error('Digite um e-mail válido.');
+      try {
+        await backend.requestPasswordReset(emailNorm, siteUrl);
+      } catch (err) {
+        // Only a missing connection is reported: any answer that depends on the
+        // account (rate limits included) could reveal whether the e-mail exists.
+        if (isCloudError(err, 'network')) throw err;
+      }
+    },
+
+    async completePasswordReset(newPassword) {
+      const user = recoveryUser;
+      if (!user) throw new Error('O link de redefinição expirou. Peça outro em "Esqueci a senha".');
+      const email = normalizeEmail(user.email);
+      const rule = checkCloudPassword(newPassword, email);
+      if (rule) throw new Error(rule.replace('A senha', 'A nova senha'));
+
+      const keys = await deriveAccountKeys(email, newPassword);
+      // Login secret only. pw_wrap still wraps the data key with the old password;
+      // only the kit (or the old password) can re-wrap it.
+      await backend.updateAuthSecret(keys.authSecret);
+      recoveryUser = null;
+      return openFromCloud(email, keys, user, cacheForEmail(email));
+    },
+
+    async unlockWithKit(phrase) {
+      if (phrase.trim().split(/\s+/).length !== 12) throw new Error('Digite as 12 palavras do kit.');
+      return recover(
+        candidate => (candidate.kitWrap ? openKitWrap(phrase, candidate.kitWrap) : Promise.resolve(null)),
+        true,
+      );
+    },
+
+    async unlockWithOldPassword(oldPassword) {
+      const step = requireKitStep();
+      if (!oldPassword) throw new Error('Digite a senha antiga.');
+      const oldKeys = await deriveAccountKeys(step.email, oldPassword);
+      return recover(candidate => openPasswordWrap(oldKeys.pwWrapKey, candidate.pwWrap), false);
+    },
+
+    async prepareFreshKeys(): Promise<VaultSetup> {
+      const step = requireKitStep();
+      const phrase = generateRecoveryPhrase();
+      const dataKey = await generateDataKeyAsync();
+      const kitWrap = await createKitWrap(phrase, dataKey, now());
+      let committed = false;
+      return {
+        phrase,
+        kitId: kitWrap.id,
+        kitCreatedAt: kitWrap.createdAt,
+        async commit(initialData: VaultData): Promise<AuthSession> {
+          if (committed) throw new Error('Estas chaves já foram salvas.');
+          const ciphertext = await encryptVault(dataKey, initialData);
+          await rewrap(step, dataKey, kitWrap, ciphertext, false);
+          committed = true;
+          const userId = step.user.id;
+          // The copy on this device is encrypted with the old key: keep it aside, then start clean.
+          if (readCloudCache(userId)) preserveCloudCache(userId, now());
+          removeCloudCache(userId);
+          return reopenAfterRecovery(step);
+        },
+      };
     },
 
     getSyncStatus: () => syncStatus,

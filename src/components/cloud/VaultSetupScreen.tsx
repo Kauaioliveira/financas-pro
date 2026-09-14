@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FilePlus2, Loader2, Upload } from 'lucide-react';
 import type { AuthSession } from '../../lib/auth';
-import type { CloudAuthProvider, VaultSetup } from '../../lib/cloud/cloudAuthProvider';
+import type { VaultSetup } from '../../lib/cloud/cloudAuthProvider';
 import type { VaultData } from '../../lib/vault';
 import { backupToVaultData } from '../../utils/backup';
 import type { BackupData } from '../../utils/backup';
@@ -12,17 +12,23 @@ import { errorText } from './errorText';
 
 type Step = 'preparing' | 'kit' | 'confirm' | 'start' | 'backup' | 'saving';
 
+/** setup: new vault. restore-backup / start-over: new key and kit that replace data the user cannot open. */
+export type VaultSetupPurpose = 'setup' | 'restore-backup' | 'start-over';
+
 /**
  * "Configurar cofre": show and print the kit, confirm 3 words, then create the
  * vault empty or with a backup (how data from the local app reaches the site).
+ * The same steps give a new kit when the old data cannot be opened.
  */
 export function VaultSetupScreen({
-  provider,
+  prepare,
+  purpose,
   email,
   onReady,
   onCancel,
 }: {
-  provider: CloudAuthProvider;
+  prepare: () => Promise<VaultSetup>;
+  purpose: VaultSetupPurpose;
   email: string;
   onReady: (session: AuthSession) => void;
   onCancel: () => void;
@@ -35,14 +41,14 @@ export function VaultSetupScreen({
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    provider.prepareVaultSetup().then(
+    prepare().then(
       prepared => {
         setSetup(prepared);
         setStep('kit');
       },
       err => setError(errorText(err, 'Não foi possível preparar o cofre.')),
     );
-  }, [provider]);
+  }, [prepare]);
 
   async function create(data: VaultData) {
     if (!setup) return;
@@ -52,7 +58,7 @@ export function VaultSetupScreen({
       onReady(await setup.commit(data));
     } catch (err) {
       setError(errorText(err, 'Não foi possível criar o cofre.'));
-      setStep('start');
+      setStep(purpose === 'start-over' ? 'confirm' : purpose === 'restore-backup' ? 'backup' : 'start');
       throw err;
     }
   }
@@ -79,7 +85,7 @@ export function VaultSetupScreen({
     return (
       <AuthPage
         wide
-        title="Configurar cofre: kit de recuperação"
+        title={purpose === 'setup' ? 'Configurar cofre: kit de recuperação' : 'Kit de recuperação novo'}
         subtitle={
           <>
             Se você esquecer a senha, o e-mail devolve o acesso à conta, mas{' '}
@@ -104,12 +110,27 @@ export function VaultSetupScreen({
         <div className="mt-5">
           <KitWordConfirmation
             phrase={setup.phrase}
-            onConfirmed={() => setStep('start')}
+            onConfirmed={() => {
+              if (purpose === 'start-over') void create({}).catch(() => undefined);
+              else setStep(purpose === 'restore-backup' ? 'backup' : 'start');
+            }}
             onBack={() => setStep('kit')}
-            confirmLabel="Confirmar palavras"
+            confirmLabel={purpose === 'start-over' ? 'Confirmar e começar do zero' : 'Confirmar palavras'}
             busyLabel="Confirmando..."
           />
+          <ErrorMessage message={error} />
         </div>
+      </AuthPage>
+    );
+  }
+
+  if (step === 'saving' && purpose === 'start-over') {
+    return (
+      <AuthPage title="Kit de recuperação novo">
+        <p role="status" className="mt-5 flex items-center gap-2 text-sm text-slate-300">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Criando o cofre novo...
+        </p>
       </AuthPage>
     );
   }
@@ -117,8 +138,12 @@ export function VaultSetupScreen({
   return (
     <AuthPage
       wide
-      title="Como quer começar?"
-      subtitle="Para trazer os dados do app que você usa no computador, exporte um backup lá (Configurações → Exportar backup) e escolha o arquivo aqui."
+      title={purpose === 'restore-backup' ? 'Restaurar de um backup' : 'Como quer começar?'}
+      subtitle={
+        purpose === 'restore-backup'
+          ? 'Escolha o arquivo de backup. Ele passa a ser o conteúdo da conta, protegido pelo kit novo.'
+          : 'Para trazer os dados do app que você usa no computador, exporte um backup lá (Configurações → Exportar backup) e escolha o arquivo aqui.'
+      }
     >
       <ErrorMessage message={error} />
       {step === 'saving' ? (
@@ -134,7 +159,11 @@ export function VaultSetupScreen({
             successMessage="Backup importado."
             onImport={json => create(backupToVaultData(JSON.parse(json) as BackupData))}
           />
-          <SecondaryButton onClick={() => { setError(''); setStep('start'); }}>Voltar</SecondaryButton>
+          {purpose === 'setup' ? (
+            <SecondaryButton onClick={() => { setError(''); setStep('start'); }}>Voltar</SecondaryButton>
+          ) : (
+            <SecondaryButton onClick={onCancel}>Cancelar</SecondaryButton>
+          )}
         </div>
       ) : (
         <>

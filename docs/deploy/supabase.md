@@ -164,8 +164,9 @@ Faça em janela anônima, com o site rodando (`npm run dev` com o `.env.local`, 
    Nada pode sumir sem você escolher.
 6. Desligar a internet → editar → aparece "sem sincronizar" → religar → os dados sobem.
 7. **Esqueci a senha** → link do e-mail → nova senha → digitar o kit → dados de volta.
-8. Configurações → **Gerar kit novo** → sair → tentar "Abrir dados com o kit" com o kit antigo.
-   Ele deve abrir **apenas** os dados da época (o app avisa), e o kit novo deve abrir os atuais.
+8. Configurações → **Gerar kit novo** → sair → "Esqueci a senha" de novo → em "Abrir dados com o kit",
+   digitar o kit **antigo**: o app deve avisar que ele só abre uma cópia antiga (com a data) e pedir
+   confirmação antes de restaurá-la. Cancele e use o kit **novo**: ele abre os dados atuais.
 9. Tentar criar conta com um e-mail fora da allowlist → deve ser recusado.
 
 Passou tudo? Repita as seções 1 a 7 no projeto de produção.

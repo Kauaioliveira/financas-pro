@@ -1,22 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { LogOut } from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import type { SignInResult } from '../../lib/auth';
 import type { CloudAuthProvider } from '../../lib/cloud/cloudAuthProvider';
 import { CloudLoginScreen } from './CloudLoginScreen';
 import { CloudRegisterScreen } from './CloudRegisterScreen';
 import { ConfirmEmailScreen } from './ConfirmEmailScreen';
+import { ForgotPasswordScreen } from './ForgotPasswordScreen';
+import { NewPasswordScreen } from './NewPasswordScreen';
+import { OpenWithKitScreen } from './OpenWithKitScreen';
 import { VaultSetupScreen } from './VaultSetupScreen';
-import { AuthPage, SecondaryButton } from './CloudUi';
+import type { VaultSetupPurpose } from './VaultSetupScreen';
 
 type Screen =
   | { name: 'loading' }
   | { name: 'login'; notice?: ReactNode }
   | { name: 'register' }
   | { name: 'confirm-email' }
-  | { name: 'vault-setup' }
-  | { name: 'needs-kit' };
+  | { name: 'forgot-password' }
+  | { name: 'new-password' }
+  | { name: 'vault-setup'; purpose: VaultSetupPurpose }
+  | { name: 'open-with-kit' };
 
 export function CloudAuthGate({
   provider,
@@ -37,6 +41,10 @@ export function CloudAuthGate({
     provider.start().then(start => {
       if (cancelled) return;
       setEmail(start.email);
+      if (start.passwordRecovery) {
+        setScreen({ name: 'new-password' });
+        return;
+      }
       setScreen({
         name: 'login',
         notice:
@@ -44,7 +52,17 @@ export function CloudAuthGate({
           (start.hasSession ? 'Digite sua senha para abrir seus dados. Ela nunca sai deste aparelho.' : undefined),
       });
     });
-    return () => { cancelled = true; };
+    const unsubscribe = provider.subscribeRecovery(() => {
+      if (cancelled) return;
+      setScreen({ name: 'new-password' });
+      void provider.start().then(start => {
+        if (!cancelled) setEmail(start.email);
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [provider, linkError]);
 
   // Back to the login after sign out or idle lock, keeping the e-mail.
@@ -62,14 +80,17 @@ export function CloudAuthGate({
     }
     setEmail(result.email);
     if (result.status === 'needs-email-confirmation') setScreen({ name: 'confirm-email' });
-    else if (result.status === 'needs-vault-setup') setScreen({ name: 'vault-setup' });
-    else setScreen({ name: 'needs-kit' });
+    else if (result.status === 'needs-vault-setup') setScreen({ name: 'vault-setup', purpose: 'setup' });
+    else setScreen({ name: 'open-with-kit' });
   }
 
-  async function leave() {
+  function leave() {
     signOut();
     setScreen({ name: 'login' });
   }
+
+  const prepareSetup = useCallback(() => provider.prepareVaultSetup(), [provider]);
+  const prepareFreshKeys = useCallback(() => provider.prepareFreshKeys(), [provider]);
 
   if (state.status === 'unlocked') return <>{children}</>;
 
@@ -84,27 +105,31 @@ export function CloudAuthGate({
       return <CloudRegisterScreen provider={provider} onResult={handleResult} onGoToLogin={() => setScreen({ name: 'login' })} />;
     case 'confirm-email':
       return <ConfirmEmailScreen email={email} onContinue={() => setScreen({ name: 'login' })} />;
+    case 'forgot-password':
+      return <ForgotPasswordScreen provider={provider} initialEmail={email} onBack={() => setScreen({ name: 'login' })} />;
+    case 'new-password':
+      return <NewPasswordScreen provider={provider} email={email} onResult={handleResult} />;
     case 'vault-setup':
       return (
         <VaultSetupScreen
-          provider={provider}
+          key={screen.purpose}
+          prepare={screen.purpose === 'setup' ? prepareSetup : prepareFreshKeys}
+          purpose={screen.purpose}
           email={email}
           onReady={completeUnlock}
-          onCancel={() => void leave()}
+          onCancel={() => (screen.purpose === 'setup' ? leave() : setScreen({ name: 'open-with-kit' }))}
         />
       );
-    case 'needs-kit':
+    case 'open-with-kit':
       return (
-        <AuthPage title="Seus dados não abrem com esta senha">
-          <p role="alert" className="mt-4 text-sm leading-6 text-slate-300">
-            A senha desta conta foi redefinida por e-mail. Ela devolve o acesso à conta, mas os dados continuam
-            cifrados com a senha anterior. Para abri-los você vai precisar do kit de recuperação.
-          </p>
-          <SecondaryButton onClick={() => void leave()}>
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            Sair
-          </SecondaryButton>
-        </AuthPage>
+        <OpenWithKitScreen
+          provider={provider}
+          email={email}
+          onUnlocked={completeUnlock}
+          onRestoreBackup={() => setScreen({ name: 'vault-setup', purpose: 'restore-backup' })}
+          onStartOver={() => setScreen({ name: 'vault-setup', purpose: 'start-over' })}
+          onSignOut={leave}
+        />
       );
     case 'login':
     default:
@@ -116,6 +141,10 @@ export function CloudAuthGate({
           notice={screen.name === 'login' ? screen.notice : undefined}
           onResult={handleResult}
           onGoToRegister={() => setScreen({ name: 'register' })}
+          onForgotPassword={typed => {
+            setEmail(typed);
+            setScreen({ name: 'forgot-password' });
+          }}
         />
       );
   }
