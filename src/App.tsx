@@ -47,7 +47,7 @@ function App() {
 export default App;
 
 function SecureApp() {
-  const { getDataKey, getUserId } = useAuth();
+  const { vaultStore, getUserId } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isResetOpen, setIsResetOpen] = useState(false);
 
@@ -75,7 +75,7 @@ function SecureApp() {
   }
 
   return (
-    <FinanceProvider dataKey={getDataKey()!} userId={getUserId()!}>
+    <FinanceProvider key={getUserId()!} store={vaultStore!}>
       <ImportDraftProvider>
         <AppShell
           activeTab={activeTab}

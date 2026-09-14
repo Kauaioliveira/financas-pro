@@ -1,6 +1,14 @@
 import { createContext } from 'react';
-import type { AuthProvider as AuthProviderType, AuthSession, KitRenewal, UserAccount } from '../lib/auth';
+import type {
+  AuthMode,
+  AuthProviderV2,
+  AuthSession,
+  KitRenewal,
+  RegisterResult,
+  UserAccount,
+} from '../lib/auth';
 import type { VaultEnvelope } from '../lib/crypto';
+import type { VaultStore } from '../lib/vault';
 
 export type AuthState =
   | { status: 'locked' }
@@ -8,9 +16,15 @@ export type AuthState =
 
 export interface AuthContextType {
   state: AuthState;
+  mode: AuthMode;
   users: UserAccount[];
-  provider: AuthProviderType;
-  register: (displayName: string, password: string) => Promise<void>;
+  /** False until the account list has been read once; screens wait for it. */
+  usersLoaded: boolean;
+  provider: AuthProviderV2;
+  /** Vault storage for the unlocked session, or null when locked. */
+  vaultStore: VaultStore | null;
+  /** Creates the account and its recovery kit without unlocking the app. */
+  register: (displayName: string, password: string) => Promise<RegisterResult>;
   signIn: (userId: string, password: string) => Promise<void>;
   signOut: () => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
@@ -21,8 +35,7 @@ export interface AuthContextType {
   getUserId: () => string | null;
   getDisplayName: () => string;
   getEnvelope: () => VaultEnvelope | null;
-  updateEnvelope: (envelope: VaultEnvelope) => void;
-  refreshUsers: () => void;
+  refreshUsers: () => Promise<void>;
 }
 
 export const AuthCtx = createContext<AuthContextType | null>(null);

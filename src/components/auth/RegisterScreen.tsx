@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
 import { Wallet, Eye, EyeOff, UserPlus, Loader2, ArrowLeft, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { generateRecoveryPhrase, addRecoveryWrap } from '../../lib/crypto';
-import { readLegacyData, clearLegacyData, saveVaultData } from '../../utils/secureStorage';
+import { readLegacyData, clearLegacyData } from '../../utils/secureStorage';
 import { KitWordConfirmation, RecoveryKitSheet } from './RecoveryKit';
 
 const CTA_GRADIENT = 'linear-gradient(135deg, #22d3ee, #3b82f6)';
@@ -18,7 +17,7 @@ export function RegisterScreen({
   hasExistingUsers: boolean;
   hasLegacyData: boolean;
 }) {
-  const { provider, signIn, refreshUsers } = useAuth();
+  const { provider, register, signIn } = useAuth();
   const [step, setStep] = useState<'form' | 'kit' | 'confirm'>('form');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -40,23 +39,15 @@ export function RegisterScreen({
 
     setLoading(true);
     try {
-      // Create account via provider directly (does NOT unlock the AuthContext)
-      const session = await provider.register(name.trim(), password);
+      // Creates the account and its recovery kit (does NOT unlock the app yet)
+      const { session, kit: createdKit } = await register(name.trim(), password);
       setCreatedUserId(session.userId);
-      refreshUsers();
-
-      // Generate the recovery kit and wrap the data key with it
-      const phrase = generateRecoveryPhrase();
-      const envelope = provider.getEnvelope(session.userId);
-      if (!envelope) throw new Error('Conta não encontrada.');
-      const updated = await addRecoveryWrap(phrase, session.dataKey, envelope);
-      provider.updateEnvelope(session.userId, updated);
-      setKit({ phrase, kitId: updated.kitId ?? '', createdAt: updated.kitCreatedAt ?? '' });
+      setKit({ phrase: createdKit.phrase, kitId: createdKit.kitId, createdAt: createdKit.kitCreatedAt });
 
       // Migrate legacy plaintext data if present
       if (hasLegacyData) {
         const legacyData = readLegacyData();
-        await saveVaultData(session.userId, session.dataKey, legacyData);
+        await provider.createVaultStore(session).save(legacyData);
         clearLegacyData();
       }
 

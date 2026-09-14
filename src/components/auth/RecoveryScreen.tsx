@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
-import { recoverWithPhrase } from '../../lib/crypto/crypto';
-import { normalizePhrase } from '../../lib/crypto/wordlist';
 import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 
 export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
@@ -25,12 +23,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
 
     setLoading(true);
     try {
-      const envelope = provider.getEnvelope(selectedUser);
-      if (!envelope) throw new Error('Conta não encontrada.');
-
-      const normalized = normalizePhrase(phrase);
-      const newEnvelope = await recoverWithPhrase(normalized, newPassword, envelope);
-      provider.updateEnvelope(selectedUser, newEnvelope);
+      await provider.recoverWithKit({ userId: selectedUser, phrase, newPassword });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro na recuperação.');

@@ -13,7 +13,7 @@ import type {
   MonthComparisonSummary,
   Transaction,
 } from '../types';
-import { loadVaultData, saveVaultData } from '../utils/secureStorage';
+import type { VaultStore } from '../lib/vault';
 import { categorizeTransaction, guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
 import { mergeImportedCardPurchases, mergeImportedTransactions } from '../utils/importMerge';
 import type { ImportMergeResult } from '../utils/importMerge';
@@ -145,12 +145,11 @@ function safeArray<T>(val: unknown): T[] {
 
 export function FinanceProvider({
   children,
-  dataKey,
-  userId,
+  store,
 }: {
   children: ReactNode;
-  dataKey: CryptoKey;
-  userId: string;
+  /** Vault storage of the session. Mount one FinanceProvider per user (key by user id). */
+  store: VaultStore;
 }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cardAccounts, setCardAccounts] = useState<CardAccount[]>([]);
@@ -160,12 +159,12 @@ export function FinanceProvider({
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load vault data once per user. A new dataKey for the same user (recovery kit
-  // renewal re-encrypts the vault) must not reload: the in-memory state is current
-  // and the persist effect below re-saves it with the new key.
+  // Load the vault once per mount. A new store for the same user (recovery kit
+  // renewal re-encrypts the vault with a new key) must not reload: the in-memory
+  // state is current and the persist effect below re-saves it through the new store.
   useEffect(() => {
     let cancelled = false;
-    loadVaultData(userId, dataKey).then(data => {
+    store.load().then(data => {
       if (cancelled) return;
       setTransactions(safeArray(data.transactions));
       setCardAccounts(safeArray(data.cards));
@@ -176,14 +175,14 @@ export function FinanceProvider({
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, []);
 
   // Persist vault data on changes (debounced)
   const persistVault = useCallback(() => {
     if (!loaded) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      saveVaultData(userId, dataKey, {
+      store.save({
         transactions,
         cards: cardAccounts,
         card_purchases: storedCardPurchases,
@@ -191,7 +190,7 @@ export function FinanceProvider({
         rules,
       });
     }, 300);
-  }, [loaded, userId, dataKey, transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
+  }, [loaded, store, transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
 
   useEffect(() => {
     persistVault();
