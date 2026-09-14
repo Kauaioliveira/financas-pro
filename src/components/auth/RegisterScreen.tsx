@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
-import { Wallet, Eye, EyeOff, UserPlus, Loader2, ArrowLeft, AlertTriangle, Copy, CheckCircle2 } from 'lucide-react';
-import { generateRecoveryPhrase } from '../../lib/crypto';
-import { addRecoveryWrap } from '../../lib/crypto/crypto';
+import { Wallet, Eye, EyeOff, UserPlus, Loader2, ArrowLeft, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { generateRecoveryPhrase, addRecoveryWrap } from '../../lib/crypto';
 import { readLegacyData, clearLegacyData, saveVaultData } from '../../utils/secureStorage';
+import { KitWordConfirmation, RecoveryKitSheet } from './RecoveryKit';
+
+const CTA_GRADIENT = 'linear-gradient(135deg, #22d3ee, #3b82f6)';
+const FOCUS_RING =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300';
 
 export function RegisterScreen({
   onGoToLogin,
@@ -15,18 +19,16 @@ export function RegisterScreen({
   hasLegacyData: boolean;
 }) {
   const { provider, signIn, refreshUsers } = useAuth();
-  const [step, setStep] = useState<'form' | 'recovery'>('form');
+  const [step, setStep] = useState<'form' | 'kit' | 'confirm'>('form');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [recoveryPhrase, setRecoveryPhrase] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
+  const [kit, setKit] = useState<{ phrase: string; kitId: string; createdAt: string } | null>(null);
   const [createdUserId, setCreatedUserId] = useState('');
   const [unlocking, setUnlocking] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -43,15 +45,13 @@ export function RegisterScreen({
       setCreatedUserId(session.userId);
       refreshUsers();
 
-      // Generate recovery phrase and wrap with the new data key
+      // Generate the recovery kit and wrap the data key with it
       const phrase = generateRecoveryPhrase();
-      setRecoveryPhrase(phrase);
-
       const envelope = provider.getEnvelope(session.userId);
-      if (envelope) {
-        const updated = await addRecoveryWrap(phrase, session.dataKey, envelope);
-        provider.updateEnvelope(session.userId, updated);
-      }
+      if (!envelope) throw new Error('Conta não encontrada.');
+      const updated = await addRecoveryWrap(phrase, session.dataKey, envelope);
+      provider.updateEnvelope(session.userId, updated);
+      setKit({ phrase, kitId: updated.kitId ?? '', createdAt: updated.kitCreatedAt ?? '' });
 
       // Migrate legacy plaintext data if present
       if (hasLegacyData) {
@@ -60,7 +60,7 @@ export function RegisterScreen({
         clearLegacyData();
       }
 
-      setStep('recovery');
+      setStep('kit');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar conta.');
     } finally {
@@ -68,7 +68,7 @@ export function RegisterScreen({
     }
   }
 
-  async function handleConfirmRecovery() {
+  async function handleKitConfirmed() {
     setUnlocking(true);
     try {
       await signIn(createdUserId, password);
@@ -78,68 +78,71 @@ export function RegisterScreen({
     }
   }
 
-  if (step === 'recovery') {
+  if ((step === 'kit' || step === 'confirm') && kit) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4" style={{ background: 'var(--app-bg)' }}>
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           <div className="dark-surface rounded-[24px] p-6 sm:p-8">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-300 ring-1 ring-inset ring-amber-400/18">
-                <AlertTriangle className="h-5 w-5" />
+                {step === 'kit' ? (
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                )}
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Frase de recuperação</h2>
-                <p className="text-xs text-slate-400">Guarde com segurança</p>
+                <h2 className="text-lg font-semibold text-white">
+                  {step === 'kit' ? 'Kit de recuperação' : 'Confirme o seu kit'}
+                </h2>
+                <p className="text-xs text-slate-400">
+                  {step === 'kit' ? 'Guarde antes de continuar' : 'Digite as palavras pedidas'}
+                </p>
               </div>
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-slate-300">
-              Se você esquecer sua senha, esta frase é a <strong className="text-white">única maneira</strong> de recuperar seus dados.
-              Copie, imprima ou anote em local seguro.
-            </p>
+            {step === 'kit' ? (
+              <>
+                <p className="mt-4 text-sm leading-6 text-slate-300">
+                  Se você esquecer sua senha, estas 12 palavras são a <strong className="text-white">única maneira</strong> de
+                  recuperar seus dados. Imprima o kit ou anote as palavras na ordem e guarde em local seguro.
+                </p>
 
-            <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4">
-              <p className="select-all text-center font-mono text-sm leading-7 text-amber-100 break-words">
-                {recoveryPhrase}
-              </p>
-            </div>
+                <div className="mt-5">
+                  <RecoveryKitSheet
+                    accountName={name.trim()}
+                    phrase={kit.phrase}
+                    kitId={kit.kitId}
+                    createdAt={kit.createdAt}
+                  />
+                </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(recoveryPhrase).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                });
-              }}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
-            >
-              {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
-              {copied ? 'Copiada!' : 'Copiar frase'}
-            </button>
-
-            <label className="mt-5 flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={e => setConfirmed(e.target.checked)}
-                className="mt-0.5 h-5 w-5 rounded border-white/20 bg-white/[0.06] accent-cyan-400"
-              />
-              <span className="text-sm text-slate-300">
-                Eu copiei ou anotei a frase de recuperação em local seguro.
-              </span>
-            </label>
-
-            <button
-              type="button"
-              disabled={!confirmed || unlocking}
-              onClick={handleConfirmRecovery}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(34,211,238,0.2)] transition hover:-translate-y-[1px] disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, #22d3ee, #3b82f6)' }}
-            >
-              {unlocking ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {unlocking ? 'Entrando...' : 'Entendi, continuar'}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setStep('confirm')}
+                  className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(34,211,238,0.2)] transition hover:-translate-y-[1px] ${FOCUS_RING}`}
+                  style={{ background: CTA_GRADIENT }}
+                >
+                  Já guardei, confirmar palavras
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-sm leading-6 text-slate-300">
+                  Para ter certeza de que o kit está guardado, digite as palavras destas posições.
+                </p>
+                <div className="mt-5">
+                  <KitWordConfirmation
+                    phrase={kit.phrase}
+                    onConfirmed={handleKitConfirmed}
+                    onBack={() => setStep('kit')}
+                    confirmLabel="Confirmar e entrar"
+                    busyLabel="Entrando..."
+                    busy={unlocking}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -239,7 +242,7 @@ export function RegisterScreen({
             type="submit"
             disabled={loading}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(34,211,238,0.2)] transition hover:-translate-y-[1px] disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, #22d3ee, #3b82f6)' }}
+            style={{ background: CTA_GRADIENT }}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -10,6 +10,7 @@ import {
   importPlainBackup,
   isEncryptedBackup,
 } from '../utils/backup';
+import { RecoveryKitSettings } from './RecoveryKitSettings';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 
@@ -320,6 +321,8 @@ export function SettingsModal({
                   </div>
                 </div>
               )}
+
+              <RecoveryKitSettings />
             </div>
 
             {/* Backup */}

@@ -444,3 +444,93 @@ body::after {
     opacity: 0.22;
   }
 }
+
+/* Recovery kit: print-only sheet mounted in <body> while the kit is on screen.
+   Scoped with :has() so printing any other screen is unaffected. */
+.kit-print-sheet {
+  display: none;
+}
+
+@media print {
+  body:has(> .kit-print-sheet) {
+    background: #fff !important;
+  }
+
+  body:has(> .kit-print-sheet) > *:not(.kit-print-sheet) {
+    display: none !important;
+  }
+
+  .kit-print-sheet {
+    display: block;
+    color: #0f172a;
+    background: #fff;
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    padding: 12mm;
+  }
+
+  .kit-print-sheet h1 {
+    font-size: 18pt;
+    font-weight: 700;
+    margin: 0 0 6mm;
+  }
+
+  .kit-print-sheet h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    margin: 8mm 0 3mm;
+  }
+
+  .kit-print-sheet table {
+    border-collapse: collapse;
+    margin-bottom: 6mm;
+  }
+
+  .kit-print-sheet th {
+    text-align: left;
+    font-weight: 600;
+    padding: 1mm 6mm 1mm 0;
+  }
+
+  .kit-print-sheet td {
+    padding: 1mm 0;
+  }
+
+  .kit-print-sheet ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3mm;
+  }
+
+  .kit-print-sheet ol li {
+    border: 1px solid #94a3b8;
+    border-radius: 2mm;
+    padding: 2.5mm 3mm;
+    font-size: 14pt;
+    break-inside: avoid;
+  }
+
+  .kit-print-sheet ul {
+    padding-left: 5mm;
+    margin: 0;
+  }
+
+  .kit-print-sheet ul li {
+    margin-bottom: 1.5mm;
+  }
+
+  .kit-print-index {
+    display: inline-block;
+    min-width: 7mm;
+    color: #475569;
+    font-size: 11pt;
+  }
+
+  .kit-print-mono {
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+}

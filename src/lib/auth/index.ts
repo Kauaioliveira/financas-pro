@@ -1,2 +1,2 @@
 export { createLocalAuthProvider } from './localAuthProvider';
-export type { AuthProvider, AuthSession, UserAccount } from './types';
+export type { AuthProvider, AuthSession, KitRenewal, UserAccount } from './types';

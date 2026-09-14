@@ -6,7 +6,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { createLocalAuthProvider } from '../lib/auth';
-import type { AuthProvider as AuthProviderType, UserAccount } from '../lib/auth';
+import type { AuthProvider as AuthProviderType, KitRenewal, UserAccount } from '../lib/auth';
 import type { VaultEnvelope } from '../lib/crypto';
 import { AuthCtx } from './AuthContext.shared';
 import type { AuthState } from './AuthContext.shared';
@@ -57,6 +57,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUsers();
   }, [provider, state, refreshUsers]);
 
+  const prepareKitRenewal = useCallback(async (password: string): Promise<KitRenewal> => {
+    if (state.status !== 'unlocked') throw new Error('Sessão expirada.');
+    const session = state.session;
+    const renewal = await provider.prepareKitRenewal(session.userId, password);
+    return {
+      ...renewal,
+      commit: async () => {
+        const dataKey = await renewal.commit();
+        // The vault is now encrypted with the new key: switch the session to it,
+        // or the app would keep saving with the old one. Skip if the app locked meanwhile.
+        if (dataKeyRef.current !== null) {
+          dataKeyRef.current = dataKey;
+          setState({ status: 'unlocked', session: { ...session, dataKey } });
+        }
+        refreshUsers();
+        return dataKey;
+      },
+    };
+  }, [provider, state, refreshUsers]);
+
   const getDataKey = useCallback(() => dataKeyRef.current, []);
 
   const getUserId = useCallback(
@@ -91,6 +111,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
+
+  // Another tab changed this account's keys (kit renewal rotates the dataKey, or a
+  // password change): lock here, so this tab never saves the vault with a key the
+  // account no longer uses. Writes made by this tab do not fire "storage" events.
+  useEffect(() => {
+    if (state.status !== 'unlocked') return;
+    const { userId } = state.session;
+    const snapshot = JSON.stringify(provider.getEnvelope(userId));
+
+    function handleStorage(event: StorageEvent) {
+      if (event.storageArea !== localStorage) return;
+      if (JSON.stringify(provider.getEnvelope(userId)) === snapshot) return;
+      dataKeyRef.current = null;
+      provider.signOut();
+      setState({ status: 'locked' });
+      refreshUsers();
+    }
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [state, provider, refreshUsers]);
 
   // Auto-lock after 15 minutes of inactivity
   useEffect(() => {
@@ -129,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         changePassword,
         deleteAccount,
+        prepareKitRenewal,
         getDataKey,
         getUserId,
         getDisplayName,

@@ -42,6 +42,23 @@ export async function saveVaultData(
   }
 }
 
+/** Raw encrypted vault as stored, or null when the user has no vault yet. */
+export function readVaultCiphertext(userId: string): string | null {
+  return localStorage.getItem(vaultKey(userId));
+}
+
+/**
+ * Writes the raw encrypted vault and lets storage errors propagate. Use it for
+ * operations that must roll back on failure (e.g. renewing the recovery kit).
+ */
+export function writeVaultCiphertext(userId: string, ciphertext: string | null): void {
+  if (ciphertext === null) {
+    localStorage.removeItem(vaultKey(userId));
+  } else {
+    localStorage.setItem(vaultKey(userId), ciphertext);
+  }
+}
+
 export function deleteVaultData(userId: string): void {
   localStorage.removeItem(vaultKey(userId));
 }
