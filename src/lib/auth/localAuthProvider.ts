@@ -2,10 +2,19 @@ import {
   createVaultEnvelope,
   unlockVault,
   changeVaultPassword,
+  decryptData,
+  generateRecoveryPhrase,
+  createRecoveryKitWrap,
+  generateDataKeyAsync,
+  rotateVaultKey,
 } from '../crypto';
 import type { VaultEnvelope } from '../crypto';
-import type { AuthProvider, AuthSession, UserAccount } from './types';
-import { deleteVaultData } from '../../utils/secureStorage';
+import type { AuthProvider, AuthSession, KitRenewal, UserAccount } from './types';
+import {
+  deleteVaultData,
+  readVaultCiphertext,
+  writeVaultCiphertext,
+} from '../../utils/secureStorage';
 
 const ACCOUNTS_KEY = 'financaspro_accounts';
 const MAX_ATTEMPTS = 5;
@@ -176,5 +185,90 @@ export function createLocalAuthProvider(): AuthProvider {
     },
 
     isLockedOut,
+
+    async prepareKitRenewal(userId: string, password: string): Promise<KitRenewal> {
+      const account = loadAccounts().find(a => a.id === userId);
+      if (!account) throw new Error('Conta não encontrada.');
+
+      // Re-authentication: throws "Senha incorreta." before anything is generated.
+      const currentDataKey = await unlockVault(password, account.envelope);
+
+      const phrase = generateRecoveryPhrase();
+      const dataKey = await generateDataKeyAsync();
+      const wrap = await createRecoveryKitWrap(phrase, dataKey);
+      let committed = false;
+
+      return {
+        phrase,
+        kitId: wrap.kitId,
+        kitCreatedAt: wrap.kitCreatedAt,
+        previousKitId: account.envelope.kitId ?? null,
+
+        async commit(): Promise<CryptoKey> {
+          if (committed) throw new Error('Este kit já foi salvo.');
+
+          const accounts = loadAccounts();
+          const idx = accounts.findIndex(a => a.id === userId);
+          if (idx < 0) throw new Error('Conta não encontrada.');
+
+          const previousVault = readVaultCiphertext(userId);
+          const next = await rotateVaultKey(
+            password,
+            accounts[idx].envelope,
+            { dataKey, wrap },
+            previousVault,
+          );
+
+          // Prove the new state opens with the password and holds the same data
+          // before touching storage.
+          const reopenedKey = await unlockVault(password, next.envelope);
+          if (previousVault !== null && next.vaultCiphertext !== null) {
+            let matches = false;
+            try {
+              const before = await decryptData(currentDataKey, previousVault);
+              const after = await decryptData(reopenedKey, next.vaultCiphertext);
+              matches = before === after;
+            } catch {
+              matches = false;
+            }
+            if (!matches) {
+              throw new Error('Não foi possível verificar o cofre recifrado. O kit não foi trocado.');
+            }
+          }
+
+          const updatedAccounts = accounts.map((a, i) =>
+            i === idx ? { ...a, envelope: next.envelope } : a,
+          );
+
+          // Vault first, account last: setItem is atomic, so if the account write
+          // throws, only the vault needs to be put back.
+          let vaultWritten = false;
+          try {
+            if (next.vaultCiphertext !== null) {
+              writeVaultCiphertext(userId, next.vaultCiphertext);
+              vaultWritten = true;
+            }
+            saveAccounts(updatedAccounts);
+          } catch {
+            let restored = true;
+            if (vaultWritten) {
+              try {
+                writeVaultCiphertext(userId, previousVault);
+              } catch {
+                restored = false;
+              }
+            }
+            throw new Error(
+              restored
+                ? 'Não foi possível salvar o kit novo. Nada foi alterado.'
+                : 'Não foi possível salvar o kit novo nem desfazer a gravação. Não feche o app: exporte um backup em Configurações agora.',
+            );
+          }
+
+          committed = true;
+          return dataKey;
+        },
+      };
+    },
   };
 }

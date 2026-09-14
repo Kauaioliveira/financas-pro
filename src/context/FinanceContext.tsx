@@ -160,7 +160,9 @@ export function FinanceProvider({
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load vault data on mount
+  // Load vault data once per user. A new dataKey for the same user (recovery kit
+  // renewal re-encrypts the vault) must not reload: the in-memory state is current
+  // and the persist effect below re-saves it with the new key.
   useEffect(() => {
     let cancelled = false;
     loadVaultData(userId, dataKey).then(data => {
@@ -173,7 +175,8 @@ export function FinanceProvider({
       setLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [userId, dataKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // Persist vault data on changes (debounced)
   const persistVault = useCallback(() => {

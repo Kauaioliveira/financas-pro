@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { AuthProvider as AuthProviderType, AuthSession, UserAccount } from '../lib/auth';
+import type { AuthProvider as AuthProviderType, AuthSession, KitRenewal, UserAccount } from '../lib/auth';
 import type { VaultEnvelope } from '../lib/crypto';
 
 export type AuthState =
@@ -15,6 +15,8 @@ export interface AuthContextType {
   signOut: () => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
+  /** Re-authenticates and generates a kit in memory; nothing is saved until commit(). */
+  prepareKitRenewal: (password: string) => Promise<KitRenewal>;
   getDataKey: () => CryptoKey | null;
   getUserId: () => string | null;
   getDisplayName: () => string;
