@@ -11,6 +11,7 @@ export {
   generateDataKeyAsync,
   createRecoveryKitWrap,
   rotateVaultKey,
+  unlockRecoveryWrap,
 } from './crypto';
 export type { VaultEnvelope, EncryptedPayload, RecoveryKitWrap } from './crypto';
 export {

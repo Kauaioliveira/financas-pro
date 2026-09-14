@@ -3,6 +3,7 @@ import { createLocalAuthProvider } from './localAuthProvider';
 import { recoverWithPhrase } from '../crypto';
 import type { VaultEnvelope } from '../crypto';
 import { loadVaultData } from '../../utils/secureStorage';
+import { exportBackupV2, importBackupV2 } from '../../utils/backup';
 import legacyFixture from '../../test/fixtures/legacy-v1.json';
 
 // An account exactly as the previous code stored it (PBKDF2 310k, no kit id).
@@ -26,6 +27,24 @@ describe('existing local account (legacy fixture)', () => {
     const session = await provider.signIn(account.id, legacyFixture.password);
     expect(session.displayName).toBe('Conta Legada');
     expect(await loadVaultData(account.id, session.dataKey)).toEqual(legacyFixture.expectedVault);
+  }, SLOW);
+
+  it('exports a v2 backup that opens with the original phrase and with the password', async () => {
+    const provider = createLocalAuthProvider();
+    const session = await provider.signIn(account.id, legacyFixture.password);
+    const file = await exportBackupV2(
+      JSON.stringify(legacyFixture.expectedBackup),
+      session.dataKey,
+      provider.getEnvelope(account.id) as VaultEnvelope,
+    );
+
+    expect(JSON.parse(file).wraps.kit.id).toBeNull();
+    expect(await importBackupV2(file, { kind: 'kit', phrase: legacyFixture.phrase })).toEqual(
+      legacyFixture.expectedBackup,
+    );
+    expect(
+      await importBackupV2(file, { kind: 'password', password: legacyFixture.password }),
+    ).toEqual(legacyFixture.expectedBackup);
   }, SLOW);
 
   it('renews the kit: old phrase stops working, password and data keep working', async () => {
