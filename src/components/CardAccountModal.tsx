@@ -83,7 +83,7 @@ export function CardAccountModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
       <div className="absolute inset-0 bg-slate-950/76 backdrop-blur-sm" onClick={onClose} />
-      <div className="dark-surface animate-scale-in relative w-full rounded-t-[28px] p-5 sm:max-w-xl sm:rounded-[28px] sm:p-6">
+      <div className="dark-surface animate-scale-in relative max-h-[90dvh] w-full overflow-y-auto rounded-t-[28px] p-5 sm:max-h-[calc(100dvh-3rem)] sm:max-w-xl sm:rounded-[24px] sm:p-6">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/12 text-cyan-200 ring-1 ring-inset ring-cyan-400/18">
             <CreditCard className="h-5 w-5" />

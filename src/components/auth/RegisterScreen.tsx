@@ -82,7 +82,7 @@ export function RegisterScreen({
     return (
       <div className="flex min-h-screen items-center justify-center p-4" style={{ background: 'var(--app-bg)' }}>
         <div className="w-full max-w-md">
-          <div className="dark-surface rounded-[28px] p-6 sm:p-8">
+          <div className="dark-surface rounded-[24px] p-6 sm:p-8">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-300 ring-1 ring-inset ring-amber-400/18">
                 <AlertTriangle className="h-5 w-5" />
@@ -156,7 +156,7 @@ export function RegisterScreen({
           >
             <Wallet className="h-8 w-8" />
           </div>
-          <h1 className="font-display text-3xl font-semibold text-[color:var(--app-fg-strong)]">
+          <h1 className="font-display text-2xl font-semibold text-[color:var(--app-fg-strong)]">
             FinançasPro
           </h1>
           <p className="mt-2 text-sm text-slate-400">
@@ -166,7 +166,7 @@ export function RegisterScreen({
 
         <form
           onSubmit={handleRegister}
-          className="dark-surface rounded-[28px] p-6 sm:p-8"
+          className="dark-surface rounded-[24px] p-6 sm:p-8"
         >
           <h2 className="text-lg font-semibold text-white">Criar conta</h2>
 
@@ -207,7 +207,7 @@ export function RegisterScreen({
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-200"
                 tabIndex={-1}
               >
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

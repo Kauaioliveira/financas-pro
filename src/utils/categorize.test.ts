@@ -62,6 +62,24 @@ describe('categorizeTransaction', () => {
   it('defaults to debito when nothing matches', () => {
     expect(categorizeTransaction('Loja XPTO 123')).toBe('debito');
   });
+
+  it('classifies an explicit debit card purchase as debito, not credito', () => {
+    expect(categorizeTransaction('COMPRA CARTAO DEBITO SUPERMERCADO X', -120)).toBe('debito');
+  });
+
+  it('does not mistake a date inside the description for an installment', () => {
+    expect(categorizeTransaction('Pagamento de boleto 01/08', -250)).toBe('debito');
+  });
+
+  it('never classifies incoming money as a card purchase', () => {
+    expect(categorizeTransaction('CREDITO SALARIO EMPRESA X', 3500)).not.toBe('credito');
+    expect(categorizeTransaction('Credito em conta', 100)).not.toBe('credito');
+  });
+
+  it('still classifies outgoing card purchases and installments as credito', () => {
+    expect(categorizeTransaction('Compra cartao loja', -50)).toBe('credito');
+    expect(categorizeTransaction('Parcela 02/10 loja', -30)).toBe('credito');
+  });
 });
 
 describe('getTypeLabel / getTypeColor', () => {

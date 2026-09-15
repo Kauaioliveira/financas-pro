@@ -14,7 +14,9 @@ import type {
   Transaction,
 } from '../types';
 import { loadVaultData, saveVaultData } from '../utils/secureStorage';
-import { guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
+import { categorizeTransaction, guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
+import { mergeImportedCardPurchases, mergeImportedTransactions } from '../utils/importMerge';
+import type { ImportMergeResult } from '../utils/importMerge';
 import { getInvoiceCloseDate, getInvoiceDueDate, getInvoiceStatus } from '../utils/credit';
 import { FinanceContext } from './FinanceContext.shared';
 
@@ -195,20 +197,19 @@ export function FinanceProvider({
   const cardInvoices = recalculateInvoices(cardAccounts, storedCardPurchases, storedInvoices);
   const cardPurchases = applyPurchaseStatuses(storedCardPurchases, cardInvoices);
 
-  const addTransactions = useCallback((newTransactions: Transaction[]) => {
-    setTransactions(prev => {
-      const existingIds = new Set(prev.map(transaction => transaction.id));
-      const existingKeys = new Set(
-        prev.map(transaction => `${transaction.date}|${transaction.description}|${transaction.amount}|${transaction.bank}`)
-      );
-      const deduped = newTransactions.filter(transaction => {
-        if (existingIds.has(transaction.id)) return false;
-        const key = `${transaction.date}|${transaction.description}|${transaction.amount}|${transaction.bank}`;
-        return !existingKeys.has(key);
-      });
-      return [...prev, ...deduped];
-    });
-  }, []);
+  const addTransactions = useCallback(
+    (newTransactions: Transaction[]): ImportMergeResult => {
+      const result = mergeImportedTransactions(transactions, newTransactions);
+      if (result.added.length > 0) {
+        setTransactions(prev => {
+          const ids = new Set(prev.map(transaction => transaction.id));
+          return [...prev, ...result.added.filter(transaction => !ids.has(transaction.id))];
+        });
+      }
+      return result;
+    },
+    [transactions]
+  );
 
   const addCardAccount = useCallback((card: CardAccount) => {
     setCardAccounts(prev => {
@@ -225,23 +226,19 @@ export function FinanceProvider({
     );
   }, []);
 
-  const addCardPurchases = useCallback((incomingPurchases: CardPurchase[]) => {
-    setStoredCardPurchases(prev => {
-      const existingIds = new Set(prev.map(purchase => purchase.id));
-      const existingKeys = new Set(
-        prev.map(
-          purchase =>
-            `${purchase.cardId}|${purchase.date}|${purchase.description}|${purchase.amount}|${purchase.sourceName}`
-        )
-      );
-      const deduped = incomingPurchases.filter(purchase => {
-        if (existingIds.has(purchase.id)) return false;
-        const key = `${purchase.cardId}|${purchase.date}|${purchase.description}|${purchase.amount}|${purchase.sourceName}`;
-        return !existingKeys.has(key);
-      });
-      return [...prev, ...deduped];
-    });
-  }, []);
+  const addCardPurchases = useCallback(
+    (incomingPurchases: CardPurchase[]): ImportMergeResult<CardPurchase> => {
+      const result = mergeImportedCardPurchases(storedCardPurchases, incomingPurchases);
+      if (result.added.length > 0) {
+        setStoredCardPurchases(prev => {
+          const ids = new Set(prev.map(purchase => purchase.id));
+          return [...prev, ...result.added.filter(purchase => !ids.has(purchase.id))];
+        });
+      }
+      return result;
+    },
+    [storedCardPurchases]
+  );
 
   const markInvoicePaid = useCallback((invoiceId: string, paid: boolean) => {
     setStoredInvoices(prev => {
@@ -269,6 +266,7 @@ export function FinanceProvider({
     setTransactions(prev =>
       prev.map(transaction => ({
         ...transaction,
+        type: categorizeTransaction(transaction.description, transaction.amount),
         category: guessCategory(transaction.description, rules),
       }))
     );

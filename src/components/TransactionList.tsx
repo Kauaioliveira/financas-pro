@@ -88,7 +88,7 @@ export function TransactionList() {
         />
       </section>
 
-      <section className="dark-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-6">
+      <section className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -133,7 +133,7 @@ export function TransactionList() {
 
       <section className="grid gap-3">
         {filtered.length === 0 ? (
-          <div className="dark-surface rounded-[28px] px-5 py-10 text-center text-sm text-slate-400">
+          <div className="dark-surface rounded-[24px] px-5 py-10 text-center text-sm text-slate-400">
             {transactions.length === 0
               ? 'Nenhuma transação importada ainda. Vá em "Importar Extrato" para começar.'
               : 'Nenhuma transação encontrada com esse filtro. Tente alterar o tipo, mês ou busca.'}
@@ -146,11 +146,13 @@ export function TransactionList() {
             );
 
             return (
-              <div key={transaction.id} className="dark-surface rounded-[20px] sm:rounded-[28px] p-3.5 sm:p-5">
+              <div key={transaction.id} className="dark-surface rounded-[16px] sm:rounded-[24px] p-3.5 sm:p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <p className="text-sm font-semibold text-white">{transaction.description}</p>
+                      <p className="min-w-0 max-w-full text-sm font-semibold text-white [overflow-wrap:anywhere]">
+                        {transaction.description}
+                      </p>
                       <span
                         className="inline-flex rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-bold text-white"
                         style={{ backgroundColor: getTypeColor(transaction.type) }}
@@ -211,7 +213,7 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <div className="dark-surface rounded-[28px] p-5">
+    <div className="dark-surface rounded-[24px] p-5">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05]">
           {icon}
