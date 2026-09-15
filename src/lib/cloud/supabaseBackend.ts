@@ -62,6 +62,8 @@ export function toCloudDataError(error: ErrorLike): CloudError {
   if (isNetwork(error)) return new CloudError('network');
   const code = error.code ?? '';
   if (code === '23505') return new CloudError('conflict');
+  // 54000: teto de trocas de chave do gatilho snapshot_vault_keys. Nada foi alterado.
+  if (code === '54000') return new CloudError('too-many-key-changes');
   if (code === '28000' || code === '42501' || code === 'PGRST301' || code === 'PGRST303') {
     return new CloudError('not-authenticated');
   }

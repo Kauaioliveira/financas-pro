@@ -137,6 +137,9 @@ describe('supabaseBackend auth calls', () => {
     expect(toCloudAuthError({ name: 'AuthRetryableFetchError', status: 0 }).kind).toBe('network');
     expect(toCloudAuthError({ status: 500, message: 'internal details' }).message).not.toContain('internal');
     expect(toCloudDataError({ code: '42501' }).kind).toBe('not-authenticated');
+    // 54000 vem do teto de trocas de chave: a mensagem precisa dizer para esperar.
+    expect(toCloudDataError({ code: '54000' }).kind).toBe('too-many-key-changes');
+    expect(toCloudDataError({ code: '54000' }).message).toMatch(/aguarde/i);
   });
 
   it('forwards PASSWORD_RECOVERY outside the supabase-js callback', async () => {

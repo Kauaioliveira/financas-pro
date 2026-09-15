@@ -7,6 +7,7 @@ export type CloudErrorKind =
   | 'weak-password'
   | 'not-authenticated'
   | 'conflict'
+  | 'too-many-key-changes'
   | 'server';
 
 const MESSAGES: Record<CloudErrorKind, string> = {
@@ -18,6 +19,8 @@ const MESSAGES: Record<CloudErrorKind, string> = {
   'weak-password': 'O servidor recusou a senha. Tente outra.',
   'not-authenticated': 'Sua sessão na nuvem expirou. Entre de novo.',
   conflict: 'Os dados na nuvem mudaram em outro aparelho.',
+  'too-many-key-changes':
+    'Muitas trocas de senha ou de kit nas últimas 24 horas. Aguarde e tente de novo — nada foi alterado.',
   server: 'A nuvem respondeu com um erro. Tente de novo em instantes.',
 };
 
