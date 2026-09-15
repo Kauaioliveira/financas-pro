@@ -106,7 +106,10 @@ create trigger vaults_snapshot
 
 ------------------------------------------------------------
 -- 3) Histórico das chaves: TODA mudança de kdf, pw_wrap ou kit_wrap guarda os valores
---    anteriores, sem limite de frequência; mantém as 10 mais recentes. Usuário só lê.
+--    anteriores. Nada com menos de 30 dias é apagado, e cabem no máximo 20 trocas em
+--    24 h: assim uma rajada de trocas (e-mail invadido) não empurra para fora do
+--    histórico a chave boa de antes do ataque. Passados 30 dias, mantém as 10 mais
+--    recentes. Usuário só lê.
 --    É o que permite abrir os dados com o kit depois que alguém sobrescreveu as chaves.
 ------------------------------------------------------------
 create table public.vault_key_history (
@@ -139,11 +142,23 @@ begin
      or old.pw_wrap is distinct from new.pw_wrap
      or old.kit_wrap is distinct from new.kit_wrap
   then
+    -- Teto de trocas: quem tem só a sessão (ex.: e-mail invadido) não consegue girar as
+    -- chaves em rajada para encher o histórico. Uso legítimo — trocar senha, gerar kit
+    -- novo, recuperar — fica muito abaixo disso.
+    if (select count(*) from public.vault_key_history h
+         where h.user_id = old.user_id
+           and h.created_at > now() - interval '24 hours') >= 20 then
+      raise exception 'too_many_key_changes' using errcode = '54000';
+    end if;
+
     insert into public.vault_key_history (user_id, kdf, pw_wrap, kit_wrap, keys_version)
     values (old.user_id, old.kdf, old.pw_wrap, old.kit_wrap, old.keys_version);
 
+    -- Nada com menos de 30 dias sai: é o que garante que a chave boa sobreviva a uma
+    -- rajada de trocas. Depois disso, mantém as 10 mais recentes.
     delete from public.vault_key_history h
      where h.user_id = old.user_id
+       and h.created_at < now() - interval '30 days'
        and h.id not in (
          select h2.id from public.vault_key_history h2
           where h2.user_id = old.user_id

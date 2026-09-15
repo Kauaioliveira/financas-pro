@@ -106,13 +106,34 @@ begin
   exception when invalid_parameter_value then null;
   end;
 
-  -- Histórico de chaves: guarda toda mudança, sem limite de frequência, e mantém 10.
+  -- Histórico de chaves: guarda toda mudança e não apaga nada com menos de 30 dias,
+  -- mesmo depois de muitas trocas seguidas (2 antes daqui + 12 do laço = 14).
   for i in 1..12 loop
     k := public.set_password_wrap((select keys_version from public.vaults), '{"alg":"x"}',
                                   jsonb_build_object('iv', 'i', 'wrapped', 'loop' || i));
   end loop;
-  if (select count(*) from public.vault_key_history) <> 10 then
-    raise exception 'FALHA: vault_key_history devia manter 10, tem %', (select count(*) from public.vault_key_history);
+  if (select count(*) from public.vault_key_history) <> 14 then
+    raise exception 'FALHA: vault_key_history devia ter as 14 trocas recentes, tem %',
+                    (select count(*) from public.vault_key_history);
+  end if;
+  if not exists (select 1 from public.vault_key_history where pw_wrap->>'wrapped' = 'pw0') then
+    raise exception 'FALHA: a chave original saiu do histórico antes de 30 dias';
+  end if;
+
+  -- Teto de 20 trocas de chave por 24 h: as 6 seguintes ainda passam, a 21a e recusada
+  -- e nao altera as chaves do cofre.
+  for i in 13..18 loop
+    k := public.set_password_wrap((select keys_version from public.vaults), '{"alg":"x"}',
+                                  jsonb_build_object('iv', 'i', 'wrapped', 'loop' || i));
+  end loop;
+  begin
+    perform public.set_password_wrap((select keys_version from public.vaults), '{"alg":"x"}',
+                                     '{"iv":"i","wrapped":"rajada"}');
+    raise exception 'FALHA: a 21a troca de chave em 24 h devia ser recusada';
+  exception when program_limit_exceeded then null;
+  end;
+  if (select pw_wrap->>'wrapped' from public.vaults) = 'rajada' then
+    raise exception 'FALHA: troca recusada mesmo assim alterou as chaves';
   end if;
 
   -- Histórico só leitura.
