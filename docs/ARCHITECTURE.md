@@ -149,7 +149,9 @@ stateDiagram-v2
 | `vaultCache.ts` | Cache local cifrado por usuário, índice de contas e id do aparelho |
 | `vaultCrypto.ts` | Cifra/decifra o cofre (gzip + AES-GCM), cria e abre embrulhos de kit e de senha |
 | `syncEngine.ts` | Sincronização otimista, estados, conflitos e gatilhos do navegador |
+| `mergeVault.ts` | Fusão em 3 vias por `id` (e só `paid` nas faturas), com contagem de conflitos |
 | `passwordPolicy.ts` | Regra de senha do modo nuvem (mínimo 12, lista de senhas comuns, não conter o e-mail) |
+| `feedback.ts` | Tipos e validação da opinião dos testadores (tipo, mensagem de até 2.000, tela, versão) |
 | `errors.ts` | `CloudError` com mensagem pronta em português |
 
 ### Contextos React (`src/context/`)
@@ -188,7 +190,8 @@ stateDiagram-v2
 | `components/RecoveryKitSettings.tsx` | "Gerar kit novo": senha, folha, 3 palavras e só então o giro da chave |
 | `components/BackupSettings.tsx` / `BackupImport.tsx` | Exportar backup v2; restaurar v2 (kit ou senha), v1 ou JSON |
 | `components/VaultLoadErrorScreen.tsx` | Cofre que não abre: tentar de novo, sair, restaurar backup |
-| `components/SyncBadge.tsx` / `SyncConflictDialog.tsx` | Estado da sincronização e escolha de versão no conflito |
+| `components/SyncBadge.tsx` / `SyncConflictDialog.tsx` | Estado da sincronização e escolha de versão quando a fusão não resolve |
+| `components/cloud/FeedbackDialog.tsx` | "Dar opinião" do beta: tipo, mensagem, tela e versão; sem nada do cofre |
 | `components/Dashboard.tsx`, `ImportStatement.tsx`, `CardStatementImport.tsx`, `TransactionList.tsx`, `CreditCardView.tsx`, `CategoryRules.tsx`, `SettingsModal.tsx`, `Sidebar.tsx` | Telas do app |
 
 ## Sincronização (modo nuvem)

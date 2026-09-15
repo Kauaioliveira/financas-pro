@@ -62,6 +62,7 @@ export function toCloudDataError(error: ErrorLike): CloudError {
   if (isNetwork(error)) return new CloudError('network');
   const code = error.code ?? '';
   if (code === '23505') return new CloudError('conflict');
+  if (error.status === 429 || code.startsWith('over_')) return new CloudError('rate-limited');
   // 54000: teto de trocas de chave do gatilho snapshot_vault_keys. Nada foi alterado.
   if (code === '54000') return new CloudError('too-many-key-changes');
   if (code === '28000' || code === '42501' || code === 'PGRST301' || code === 'PGRST303') {
@@ -246,6 +247,17 @@ export function createSupabaseBackend(client: SupabaseClient): CloudBackend {
         keysVersion: row.keys_version,
         createdAt: row.created_at,
       }));
+    },
+
+    async sendFeedback(feedback) {
+      await run(
+        client.from('feedback').insert({
+          kind: feedback.kind,
+          message: feedback.message,
+          screen: feedback.screen,
+          app_version: feedback.appVersion,
+        }),
+      );
     },
 
     async fetchVaultHistory(): Promise<VaultHistoryRow[]> {

@@ -214,9 +214,10 @@ Senha --------+--> PBKDF2-SHA256 (600k iterações) --> master
 - **Trocar o e-mail da conta quebra o login**, porque o salt da senha deriva do e-mail.
 - O **plano grátis do Supabase pausa o projeto** depois de dias sem uso. Nada é apagado: é preciso reativar no painel.
 <!-- VERIFICAR: o prazo exato da pausa (o guia do Supabase diz 7 dias) vem do relatório de pesquisa, não de um projeto em uso; confirme no painel antes de prometer um número. -->
-- **Conflito entre dois aparelhos** é resolvido por escolha sua, sem fusão automática.
+- **Dois aparelhos editando ao mesmo tempo** têm as alterações juntadas por registro. Quando os dois mudam o mesmo registro fica o deste aparelho, e o app avisa quantos casos assim houve.
 - O **histórico de chaves** guarda no mínimo 30 dias (depois disso, as 10 versões mais recentes) e recusa mais de **20 trocas de chave em 24 horas**.
-- Ainda **não existem** tela de opinião, página de privacidade/termos e telas de consentimento. **Não convide outras pessoas para o beta nesta etapa.**
+- **Dar opinião** manda para o dono apenas o texto que você escrever, o nome da tela e a versão do app. Nenhum dado financeiro sai do aparelho.
+- Ainda **não existem** página de privacidade/termos e telas de consentimento. **Não convide outras pessoas para o beta nesta etapa.**
 
 ## Arquitetura
 

@@ -140,6 +140,8 @@ describe('supabaseBackend auth calls', () => {
     // 54000 vem do teto de trocas de chave: a mensagem precisa dizer para esperar.
     expect(toCloudDataError({ code: '54000' }).kind).toBe('too-many-key-changes');
     expect(toCloudDataError({ code: '54000' }).message).toMatch(/aguarde/i);
+    // Um pedido recusado por excesso (ex.: muitas opiniões seguidas) pede para esperar.
+    expect(toCloudDataError({ status: 429, code: 'over_request_rate_limit' }).kind).toBe('rate-limited');
   });
 
   it('forwards PASSWORD_RECOVERY outside the supabase-js callback', async () => {

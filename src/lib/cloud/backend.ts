@@ -1,3 +1,5 @@
+import type { Feedback } from './feedback';
+
 /**
  * What the app needs from the cloud, independent of Supabase. The real adapter is
  * supabaseBackend.ts; tests use an in-memory fake with the same server rules
@@ -114,4 +116,6 @@ export interface CloudBackend {
   fetchKeyHistory(): Promise<KeyHistoryRow[]>;
   /** Most recent first. */
   fetchVaultHistory(): Promise<VaultHistoryRow[]>;
+  /** Testers' opinion: insert only, nothing is read back. Never carries vault data. */
+  sendFeedback(feedback: Feedback): Promise<void>;
 }

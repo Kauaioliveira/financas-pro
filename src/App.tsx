@@ -7,7 +7,7 @@ import { ImportDraftProvider } from './context/ImportDraftContext';
 import { AuthGate } from './components/auth/AuthGate';
 import { Sidebar } from './components/Sidebar';
 import type { TabType } from './types';
-import { Settings, Trash2, X, AlertTriangle, CloudDownload, Menu, LogOut, UserCog } from 'lucide-react';
+import { Settings, Trash2, X, AlertTriangle, CloudDownload, Menu, LogOut, MessageSquare, UserCog } from 'lucide-react';
 import { useFinance } from './context/useFinance';
 import { SettingsModal } from './components/SettingsModal';
 import { VaultLoadErrorScreen } from './components/VaultLoadErrorScreen';
@@ -40,6 +40,7 @@ const CategoryRules = lazy(async () => ({
 // Cloud builds only: with __FINANCASPRO_CLOUD__ false this is dead code, so neither the
 // cloud screens nor @supabase/supabase-js end up in the local bundle.
 const CloudRoot = __FINANCASPRO_CLOUD__ ? lazy(() => import('./components/cloud/CloudRoot')) : null;
+const FeedbackDialog = __FINANCASPRO_CLOUD__ ? lazy(() => import('./components/cloud/FeedbackDialog')) : null;
 
 function App() {
   if (CloudRoot) {
@@ -149,6 +150,7 @@ function AppShell({
       ? syncStatus.message
       : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
     try {
@@ -266,6 +268,17 @@ function AppShell({
               >
                 <Menu className="h-[18px] w-[18px]" />
               </button>
+              {FeedbackDialog && (
+                <button
+                  type="button"
+                  onClick={() => setIsFeedbackOpen(true)}
+                  className="shell-icon-button hover:text-cyan-100"
+                  title="Dar opinião sobre o beta"
+                  aria-label="Dar opinião sobre o beta"
+                >
+                  <MessageSquare className="h-[18px] w-[18px]" />
+                </button>
+              )}
               <button
                 onClick={() => setIsResetOpen(true)}
                 className="shell-icon-button hover:text-rose-200"
@@ -371,6 +384,12 @@ function AppShell({
         exportData={exportFinanceBackup}
         importData={importFinanceBackup}
       />
+
+      {FeedbackDialog && isFeedbackOpen && (
+        <Suspense fallback={null}>
+          <FeedbackDialog screen={tabTitle} onClose={() => setIsFeedbackOpen(false)} />
+        </Suspense>
+      )}
 
       {__FINANCASPRO_CLOUD__ && inConflict && !conflictDismissed && (
         <SyncConflictDialog

@@ -21,6 +21,7 @@ import type { VaultData, VaultStore } from '../vault';
 import type { AccountKdf, CloudBackend, CloudUser, KitWrap, PasswordWrap, VaultRow } from './backend';
 import { createCloudVaultStore } from './cloudVaultStore';
 import { CloudError, isCloudError } from './errors';
+import type { Feedback } from './feedback';
 import { checkCloudPassword } from './passwordPolicy';
 import { createSyncEngine } from './syncEngine';
 import type { ConflictChoice, SyncEngine } from './syncEngine';
@@ -89,6 +90,7 @@ export interface CloudAuthProvider extends Omit<AuthProviderV2, 'mode'> {
   readonly mode: 'cloud';
   resolveSyncConflict(choice: ConflictChoice): Promise<void>;
   syncNow(): Promise<void>;
+  sendFeedback(feedback: Feedback): Promise<void>;
   start(): Promise<CloudStart>;
   signUp(input: CloudSignUpInput): Promise<SignInResult>;
   /** Requires a previous sign-in (or sign-up) that returned needs-vault-setup. */
@@ -859,6 +861,11 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
 
     syncNow() {
       return engine ? engine.sync() : Promise.resolve();
+    },
+
+    async sendFeedback(feedback: Feedback) {
+      requireCurrent(); // only a signed-in tester writes to the feedback table
+      await backend.sendFeedback(feedback);
     },
 
     subscribeSync(listener) {

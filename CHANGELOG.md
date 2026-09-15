@@ -11,6 +11,7 @@ Mudanças relevantes para quem usa o FinançasPro. O formato segue o [Keep a Cha
 - **Modo nuvem opcional** (Supabase + Cloudflare), ligado por `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`: conta por e-mail com confirmação, cofre cifrado na nuvem, sincronização entre aparelhos, **Esqueci a senha** e **Abrir dados com o kit**. Sem essas variáveis, o app continua 100% local e o código de nuvem nem entra no arquivo publicado.
 - **Selo de sincronização** no topo (**Sincronizado**, **Sincronizando...**, **Sem sincronizar**).
 - **Fusão automática entre aparelhos**: quando dois aparelhos editam ao mesmo tempo, o app junta as alterações por registro e avisa quantos conflitos houve (nesses, fica a versão deste aparelho). O diálogo de escolha continua para o que a fusão não resolve.
+- **Dar opinião dentro do app** (só no modo nuvem): botão no topo, tipo (defeito, ideia, elogio, outro), mensagem de até 2.000 caracteres com contador, e envio automático do nome da tela e da versão do app. Nenhum dado financeiro é enviado.
 - **Beta fechado por lista de e-mails**: quem não está na tabela `beta_allowlist` não consegue criar conta.
 - **Tela de erro quando o cofre não abre**, com **Tentar de novo**, **Sair da conta** e **Restaurar backup**. Antes de restaurar, o app guarda no navegador uma cópia dos dados que não abriram.
 - **Aviso fixo quando uma gravação falha** (armazenamento cheio, por exemplo), com a opção de tentar de novo. Os dados pendentes continuam na fila em vez de serem descartados.

@@ -1,4 +1,5 @@
 import { CloudError } from '../lib/cloud/errors';
+import type { Feedback } from '../lib/cloud/feedback';
 import type {
   CloudAuthEvent,
   CloudBackend,
@@ -34,6 +35,7 @@ export class FakeCloudServer {
   autoConfirm = false;
   allowlist: Set<string> | null = null;
   resetRequests: string[] = [];
+  feedback: Array<Feedback & { userId: string }> = [];
   calls: string[] = [];
   /** Runs before every saveVault: lets a test simulate another device saving right then. */
   onBeforeSave: (() => void) | null = null;
@@ -239,6 +241,13 @@ export class FakeDevice implements CloudBackend {
       keysVersion: r.keysVersion + 1,
       updatedAt: this.server.tick(),
     })).version;
+  }
+
+  async sendFeedback(feedback: Feedback) {
+    this.net('sendFeedback');
+    const user = this.me();
+    if (feedback.message.length < 1 || feedback.message.length > 2_000) throw new CloudError('server');
+    this.server.feedback.push({ ...feedback, userId: user.id });
   }
 
   async fetchKeyHistory() {
