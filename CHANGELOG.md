@@ -9,7 +9,8 @@ Mudanças relevantes para quem usa o FinançasPro. O formato segue o [Keep a Cha
 - **Kit de recuperação renovável.** Em **Configurações → Kit de recuperação → Gerar kit novo**, o app pede a senha da conta, mostra uma folha imprimível com id curto e data, pede **3 palavras sorteadas** e só então gira a chave dos dados e grava. O kit anterior deixa de abrir a conta.
 - **Folha imprimível do kit**, com id, data, as 12 palavras numeradas e instruções de uso, no cadastro e a cada kit novo.
 - **Modo nuvem opcional** (Supabase + Cloudflare), ligado por `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`: conta por e-mail com confirmação, cofre cifrado na nuvem, sincronização entre aparelhos, **Esqueci a senha** e **Abrir dados com o kit**. Sem essas variáveis, o app continua 100% local e o código de nuvem nem entra no arquivo publicado.
-- **Selo de sincronização** no topo (**Sincronizado**, **Sincronizando...**, **Sem sincronizar**) e diálogo de conflito: quando dois aparelhos editam a mesma versão, você escolhe qual manter. Não existe fusão automática.
+- **Selo de sincronização** no topo (**Sincronizado**, **Sincronizando...**, **Sem sincronizar**).
+- **Fusão automática entre aparelhos**: quando dois aparelhos editam ao mesmo tempo, o app junta as alterações por registro e avisa quantos conflitos houve (nesses, fica a versão deste aparelho). O diálogo de escolha continua para o que a fusão não resolve.
 - **Beta fechado por lista de e-mails**: quem não está na tabela `beta_allowlist` não consegue criar conta.
 - **Tela de erro quando o cofre não abre**, com **Tentar de novo**, **Sair da conta** e **Restaurar backup**. Antes de restaurar, o app guarda no navegador uma cópia dos dados que não abriram.
 - **Aviso fixo quando uma gravação falha** (armazenamento cheio, por exemplo), com a opção de tentar de novo. Os dados pendentes continuam na fila em vez de serem descartados.

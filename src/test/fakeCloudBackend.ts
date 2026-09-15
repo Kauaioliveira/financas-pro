@@ -35,6 +35,8 @@ export class FakeCloudServer {
   allowlist: Set<string> | null = null;
   resetRequests: string[] = [];
   calls: string[] = [];
+  /** Runs before every saveVault: lets a test simulate another device saving right then. */
+  onBeforeSave: (() => void) | null = null;
   private clock = Date.parse('2026-09-14T12:00:00.000Z');
 
   tick(ms = 1_000): string {
@@ -204,6 +206,7 @@ export class FakeDevice implements CloudBackend {
   async saveVault(expectedVersion: number, ciphertext: string) {
     this.net('saveVault');
     if (!ciphertext) throw new CloudError('server');
+    this.server.onBeforeSave?.();
     const row = this.server.vaults.get(this.me().id);
     if (!row || row.version !== expectedVersion) return null;
     return this.server.updateVault(row.userId, r => ({ ...r, ciphertext, version: r.version + 1, updatedAt: this.server.tick() })).version;

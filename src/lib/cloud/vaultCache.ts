@@ -21,6 +21,13 @@ export interface CloudCache {
   version: number;
   /** Current local vault: EncryptedPayload of gzip(JSON). */
   ciphertext: string;
+  /**
+   * The vault as the cloud last confirmed it (version above), always openable with the
+   * data key of this device. It is what tells "created on the other device" from
+   * "deleted here" in the three-way merge. Null or absent (caches written by older
+   * versions, or after a key change that made it unreadable) means no automatic merge.
+   */
+  baseCiphertext?: string | null;
   /** Local ciphertext has changes the cloud has not accepted yet. */
   dirty: boolean;
   lastSyncedAt: string | null;

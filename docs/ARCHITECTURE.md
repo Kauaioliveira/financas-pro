@@ -197,7 +197,9 @@ O cofre inteiro é um único blob: `gzip(JSON)` cifrado com a `dataKey`, guardad
 
 - **Gravação local** vai para o cache cifrado do aparelho e agenda um envio com 3 s de debounce (`PUSH_DEBOUNCE_MS`).
 - **Leitura** acontece na entrada, ao voltar o foco (no máximo a cada 60 s, `PULL_STALE_MS`), quando a internet volta e antes de esconder a página.
-- **Envio** manda a versão esperada. Se o servidor recusar, o app entra em `conflict` e **pergunta** ao usuário: `use-remote` ou `keep-local`. Não existe fusão automática.
+- **Envio** manda a versão esperada. Se o servidor recusar, o app tenta uma **fusão em 3 vias** (`mergeVault.ts`) entre a base (último estado confirmado pelo servidor, `baseCiphertext` no cache), a versão local e a remota, e salva o resultado; são no máximo 3 tentativas (`MERGE_ATTEMPTS`). Ao dar certo, o selo mostra "Juntamos alterações de outro aparelho (N conflitos; mantivemos as deste aparelho)".
+  - **Regras da fusão**, por `id` em `transactions`, `cards`, `card_purchases` e `rules`, e só pelo campo `paid` em `invoices`: o que só um lado tem entra; apagado de um lado e intacto do outro sai; apagado de um lado e editado do outro fica a edição; editado dos dois lados fica o local.
+  - Sem base (cache de versão antiga do app, chaves giradas, edição feita sobre uma tela desatualizada) ou com dados que a fusão não sabe indexar por `id`, o app entra em `conflict` e **pergunta** ao usuário: `use-remote` ou `keep-local`.
 - **Dados remotos que a chave da sessão não abre nunca substituem o que está no aparelho**: o estado vira `blocked` com uma explicação.
 - **Chaves mudadas em outro aparelho** são adotadas apenas quando o embrulho remoto abre com a senha desta sessão e decifra o cofre remoto.
 

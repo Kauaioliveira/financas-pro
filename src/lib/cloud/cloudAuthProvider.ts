@@ -255,12 +255,21 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     const keysFromCloud = { kdf: row.kdf, pwWrap: row.pwWrap, kitWrap: row.kitWrap, keysVersion: row.keysVersion };
     let next: CloudCache;
     if (!cached.dirty) {
-      next = { ...cached, ...keysFromCloud, ciphertext: row.ciphertext, version: row.version, lastSyncedAt: now().toISOString() };
+      next = {
+        ...cached,
+        ...keysFromCloud,
+        ciphertext: row.ciphertext,
+        baseCiphertext: row.ciphertext,
+        version: row.version,
+        lastSyncedAt: now().toISOString(),
+      };
     } else if (await canDecryptVault(remoteKey, cached.ciphertext)) {
       next = { ...cached, ...keysFromCloud };
     } else {
+      // The data key changed: the old base does not open with the new one, and re-encrypting
+      // it could hide a rotation. Without a base the next conflict asks the user.
       const localData = await decryptVault(cachedKey, cached.ciphertext);
-      next = { ...cached, ...keysFromCloud, ciphertext: await encryptVault(remoteKey, localData) };
+      next = { ...cached, ...keysFromCloud, ciphertext: await encryptVault(remoteKey, localData), baseCiphertext: null };
     }
     writeCloudCache(next);
     return { cache: next, dataKey: remoteKey };
@@ -309,7 +318,15 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     if (cached && localOpens && cached.dirty) {
       // The password changed on another device, but the data key is the same: keep the
       // unsent local edits; the sync compares versions before sending them.
-      const next: CloudCache = { ...base, ciphertext: cached.ciphertext, version: cached.version, dirty: true, lastSyncedAt: cached.lastSyncedAt };
+      const next: CloudCache = {
+        ...base,
+        ciphertext: cached.ciphertext,
+        // Same data key, so the base of the pending edits still opens: the merge can use it.
+        baseCiphertext: cached.baseCiphertext ?? null,
+        version: cached.version,
+        dirty: true,
+        lastSyncedAt: cached.lastSyncedAt,
+      };
       writeCloudCache(next);
       return { status: 'unlocked', session: open(next, dataKey, statusFor(next, false)) };
     }
@@ -323,6 +340,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     const next: CloudCache = {
       ...base,
       ciphertext: row.ciphertext,
+      baseCiphertext: row.ciphertext,
       version: row.version,
       dirty: false,
       lastSyncedAt: now().toISOString(),
@@ -584,6 +602,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
             keysVersion: 1,
             version: 0,
             ciphertext,
+            baseCiphertext: ciphertext,
             dirty: false,
             lastSyncedAt: now().toISOString(),
           };
@@ -700,6 +719,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
               keysVersion: latest.keysVersion + 1,
               version: version!,
               ciphertext,
+              baseCiphertext: ciphertext,
               dirty: false,
               lastSyncedAt: now().toISOString(),
             }));

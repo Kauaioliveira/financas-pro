@@ -204,7 +204,7 @@ Senha --------+--> PBKDF2-SHA256 (600k iterações) --> master
 - Não é open banking: não conecta diretamente ao seu banco.
 - **No modo local, não envia nada a servidor nenhum.** No modo nuvem, envia apenas texto cifrado que o servidor não consegue abrir.
 - Não recupera dados automaticamente por e-mail: o e-mail devolve só o acesso à conta.
-- Não funde alterações de dois aparelhos automaticamente: em caso de conflito, você escolhe qual versão fica.
+- Não resolve sozinho toda edição simultânea: o app junta as alterações dos dois aparelhos por registro, mas quando os dois mudaram o mesmo registro fica o deste aparelho, e quando a fusão não é possível você escolhe qual versão fica.
 - Não permite trocar o e-mail de uma conta.
 - Não protege contra malware com acesso total ao navegador em execução.
 
