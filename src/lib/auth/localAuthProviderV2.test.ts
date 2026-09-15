@@ -90,6 +90,23 @@ describe('localAuthProviderV2', () => {
     ).resolves.toMatchObject({ status: 'unlocked' });
   });
 
+  it('accepts the kit phrase typed with accents', async () => {
+    // A lista de palavras não tem acento, mas o teclado brasileiro convida ao erro
+    // ("leão" por "leao"). O kit e o backup já aceitam; a recuperação local também deve.
+    const { session, kit } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
+    const accented = kit.phrase.replace(/a/g, 'á').replace(/e/g, 'ê').replace(/o/g, 'ô');
+    expect(accented).not.toBe(kit.phrase);
+
+    await provider.recoverWithKit({
+      userId: session.userId,
+      phrase: accented,
+      newPassword: 'recuperada1',
+    });
+    await expect(
+      provider.signIn({ userId: session.userId, password: 'recuperada1' }),
+    ).resolves.toMatchObject({ status: 'unlocked' });
+  });
+
   it('renews the kit for the current session and the old phrase stops working', async () => {
     const { session: created, kit } = await provider.register({ displayName: 'Fulano', password: 'senha123' });
     const { session } = await provider.signIn({ userId: created.userId, password: 'senha123' });

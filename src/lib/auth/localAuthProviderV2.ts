@@ -1,4 +1,4 @@
-import { addRecoveryWrap, generateRecoveryPhrase, normalizePhrase, recoverWithPhrase } from '../crypto';
+import { addRecoveryWrap, generateRecoveryPhrase, normalizeKitPhrase, recoverWithPhrase } from '../crypto';
 import { createLocalVaultStore } from '../vault';
 import { backupWrapsFromEnvelope } from '../../utils/backup';
 import { createLocalAuthProvider } from './localAuthProvider';
@@ -123,7 +123,9 @@ export function createLocalAuthProviderV2(
       }
       const envelope = base.getEnvelope(userId);
       if (!envelope) throw new Error('Conta não encontrada.');
-      const recovered = await recoverWithPhrase(normalizePhrase(input.phrase), input.newPassword, envelope);
+      // normalizeKitPhrase, e não normalizePhrase: a lista de palavras não tem acento,
+      // então quem digitar "leão" deve abrir igual, como já acontece no kit e no backup.
+      const recovered = await recoverWithPhrase(normalizeKitPhrase(input.phrase), input.newPassword, envelope);
       base.updateEnvelope(userId, recovered);
     },
 
