@@ -15,7 +15,7 @@ Tempo estimado: 40 minutos. Custo: R$ 0, sem cartão.
 | Seu e-mail | Sua senha |
 | Um "segredo de login" derivado da senha (o Supabase guarda um bcrypt dele) | A chave que abre os dados |
 | O cofre **cifrado** e os embrulhos de chave (também cifrados) | As 12 palavras do kit |
-| Até 7 cópias antigas do cofre e as 10 últimas versões dos embrulhos de chave | |
+| Até 7 cópias antigas do cofre e o histórico dos embrulhos de chave (tudo dos últimos 30 dias; passado isso, as 10 versões mais recentes) | |
 
 Consequência: redefinir a senha por e-mail devolve **o acesso à conta**. **Só o kit de
 recuperação devolve os dados.**
@@ -164,13 +164,27 @@ Faça em janela anônima, com o site rodando (`npm run dev` com o `.env.local`, 
 5. Editar nos dois aparelhos quase ao mesmo tempo → o app deve perguntar qual versão manter.
    Nada pode sumir sem você escolher.
 6. Desligar a internet → editar → aparece "sem sincronizar" → religar → os dados sobem.
-7. **Esqueci a senha** → link do e-mail → nova senha → digitar o kit → dados de volta.
+7. **Esqueci a senha** → link do e-mail → nova senha → digitar o kit → dados de volta. Peça e abra o
+   link **no mesmo navegador**: o fluxo PKCE guarda ali o verificador, e o link falha em outro aparelho.
 8. Configurações → **Gerar kit novo** → sair → "Esqueci a senha" de novo → em "Abrir dados com o kit",
    digitar o kit **antigo**: o app deve avisar que ele só abre uma cópia antiga (com a data) e pedir
    confirmação antes de restaurá-la. Cancele e use o kit **novo**: ele abre os dados atuais.
 9. Tentar criar conta com um e-mail fora da allowlist → deve ser recusado.
 
 Passou tudo? Repita as seções 1 a 7 no projeto de produção.
+
+## Se algo der errado
+
+| O que aparece | O que fazer |
+|---|---|
+| "Cadastro fechado: este e-mail ainda não está na lista do beta." | Inclua o e-mail em `beta_allowlist`, sempre em minúsculas. Se a mensagem aparecer para um e-mail que **está** na lista, confira o hook da seção 3. |
+| O e-mail de confirmação ou de redefinição não chega | Confira o SMTP (seção 5), o limite de e-mails por hora e a caixa de spam. Sem Custom SMTP, o Supabase só envia para membros do projeto. |
+| "O link do e-mail expirou ou já foi usado. Peça outro." | Peça o link no navegador em que você vai usá-lo e abra-o nesse mesmo navegador. Confira também Redirect URLs (seção 6). |
+| "E-mail ou senha incorretos." numa conta que funcionava | Alguém alterou o e-mail em Authentication → Users. Volte o e-mail ao valor anterior: a senha e o kit voltam a funcionar. |
+| "A nuvem respondeu com um erro. Tente de novo em instantes." ao gerar kit novo ou trocar senha | Pode ser o teto de 20 trocas de chave em 24 h (`too_many_key_changes` no banco). Espere e tente de novo; o app ainda não traduz esse erro. |
+| "Os dados na nuvem mudaram em outro aparelho." ao gerar kit novo | Espere o selo mostrar **Sincronizado** nos dois aparelhos e gere de novo. Nada foi alterado. |
+| O projeto aparece como **Paused** no painel | **Resume project**. Nada é apagado; há até 1 ano para reativar. |
+| `FALHA: ...` no script de verificação | Não use esse projeto. Mande a mensagem inteira para quem mantém o repositório. |
 
 ## Rotina
 
@@ -181,5 +195,7 @@ Passou tudo? Repita as seções 1 a 7 no projeto de produção.
 - **Excluir uma conta a pedido:** Authentication → Users → apagar o usuário. Cofre, históricos e
   opiniões somem em cascata.
 - **Se alguém sobrescrever suas chaves** (por exemplo, depois de tomar seu e-mail): troque a senha do
-  e-mail, redefina a senha do app e use **Abrir dados com o kit**. O app tenta o kit nas 10 últimas
-  versões das chaves guardadas no servidor.
+  e-mail, redefina a senha do app e use **Abrir dados com o kit**. O app tenta o kit em todas as
+  versões de chave que o servidor ainda guarda: tudo dos últimos 30 dias e, antes disso, as 10 mais
+  recentes. O banco também recusa mais de 20 trocas de chave em 24 h, para que uma rajada de trocas
+  não empurre a chave boa para fora do histórico.

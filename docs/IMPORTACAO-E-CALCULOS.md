@@ -204,6 +204,8 @@ O leitor de fatura (CSV e PDF) transforma todo valor em positivo antes de decidi
 **Como perceber:** na pré-visualização, procure linhas com "estorno", "crédito" ou "devolução" na descrição.
 **O que fazer:** hoje não há como remover uma compra de cartão depois de importada. Se o estorno já entrou, a única saída é **Resetar dados** (ícone de lixeira no topo), que apaga tudo, e importar de novo. Antes de confirmar a importação, a opção é editar o CSV e tirar a linha do estorno.
 
+> **Antes de resetar, exporte um backup** em Configurações → **Backup cifrado** → **Exportar backup**. O arquivo abre depois com o seu kit de recuperação ou com a senha que a conta tiver hoje. No modo nuvem, o reset também sincroniza: os outros aparelhos ficam vazios assim que receberem a alteração.
+
 ### Juros, encargos, anuidade e algumas compras não entram
 
 As linhas com `juros`, `encargos` ou `anuidade` são descartadas. Então o total da fatura no app pode ficar **abaixo** do cobrado pelo banco. O filtro compara pedaços de texto. Por isso também descarta compras reais cujo nome contenha uma dessas palavras: `TOTALPASS` contém `total` e é descartada. IOF não é descartado.
@@ -227,7 +229,7 @@ Cada compra guarda a fatura em que caiu no momento da importação. Se você mud
 - as datas de fechamento e vencimento dessa fatura passam a usar os dias novos, e o mês em que o total conta pode mudar;
 - o mês usado para **Compras abertas** e em "cai em …" (lista **Compras futuras**) continua o calculado com os dias antigos. Por isso os dois números podem ficar desencontrados.
 
-Reimportar o arquivo não corrige, porque as compras são reconhecidas como repetidas. Configure os dias corretos **antes** da primeira importação. Se precisar corrigir, a saída hoje é **Resetar dados** e importar de novo.
+Reimportar o arquivo não corrige, porque as compras são reconhecidas como repetidas. Configure os dias corretos **antes** da primeira importação. Se precisar corrigir, a saída hoje é **Resetar dados** e importar de novo — exportando um backup antes, como descrito acima.
 
 A pré-visualização aberta é uma exceção: editar o cartão com ela aberta recalcula as faturas antes de confirmar.
 

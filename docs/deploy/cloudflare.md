@@ -16,15 +16,21 @@ Custo: R$ 0. Nada aqui usa código de servidor: o `wrangler.jsonc` só serve a p
 | `scripts/check-bundle.mjs` | Roda no fim de `npm run build`: falha se houver chave `sb_secret_` ou `service_role` |
 | `.env.example` | Lista das variáveis, todas públicas |
 
+<!-- VERIFICAR: os nomes de menu e os campos do painel da Cloudflare (Import a repository, Build command, Deploy command, Variables and secrets) não foram executados por quem escreveu nem por quem revisou este guia. Confira ao publicar e corrija o que estiver diferente. -->
+
 ## Passo a passo
 
 1. Crie a conta em [dash.cloudflare.com](https://dash.cloudflare.com) e ligue a verificação em duas etapas.
 2. **Workers & Pages → Create → Import a repository**:
    - autorize o app da Cloudflare **só** no repositório `financas-pro`;
    - nome do Worker: **`financaspro`** (tem de ser igual ao `name` do `wrangler.jsonc`);
-   - Build command: `npm run build`;
+   - Build command: `npm run build` (ele já roda a guarda de bundle no fim);
    - Deploy command: `npx wrangler deploy`;
    - branch de produção: `main`.
+
+   O `wrangler` **não** é dependência do repositório: o `npx` baixa a versão mais recente a cada
+   deploy. Se um dia um deploy quebrar sem que o código tenha mudado, suspeite de uma versão nova do
+   wrangler e fixe uma (`npx wrangler@<versão> deploy`).
 3. **Settings → Build → Variables and secrets** (variáveis de **build**, não de runtime):
    - `VITE_SUPABASE_URL` = Project URL do Supabase;
    - `VITE_SUPABASE_ANON_KEY` = Publishable key (`sb_publishable_...`).
