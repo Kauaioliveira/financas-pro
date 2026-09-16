@@ -39,6 +39,9 @@ export interface FinanceContextType {
   getAvailableMonths: () => string[];
   getCardMonthSnapshot: (month: string) => CardMonthSnapshot;
   getCardInvoicesByMonth: (month: string) => CardInvoice[];
+  /** Message of the last failed save, or null. Edits stay in memory and pending until a save succeeds. */
+  saveError: string | null;
+  retrySave: () => void;
 }
 
 export const FinanceContext = createContext<FinanceContextType | null>(null);

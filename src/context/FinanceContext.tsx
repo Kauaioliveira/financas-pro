@@ -13,7 +13,8 @@ import type {
   MonthComparisonSummary,
   Transaction,
 } from '../types';
-import { loadVaultData, saveVaultData } from '../utils/secureStorage';
+import { createVaultSaver } from '../lib/vault';
+import type { VaultSaverStatus, VaultStore } from '../lib/vault';
 import { categorizeTransaction, guessCategory, isInvoicePaymentTransaction } from '../utils/categorize';
 import { mergeImportedCardPurchases, mergeImportedTransactions } from '../utils/importMerge';
 import type { ImportMergeResult } from '../utils/importMerge';
@@ -143,56 +144,154 @@ function safeArray<T>(val: unknown): T[] {
   return Array.isArray(val) ? val : [];
 }
 
+export interface VaultLoadErrorActions {
+  error: Error;
+  /** Reads the vault again with the same session. */
+  retry: () => void;
+  /**
+   * Keeps a copy of the vault that does not open, then replaces the data with a
+   * backup (JSON produced by the backup importer). Throws if the copy fails.
+   */
+  restoreBackup: (json: string) => Promise<void>;
+}
+
+type LoadState = { status: 'loading' } | { status: 'ready' } | { status: 'error'; error: Error };
+
+function saveErrorMessage(status: VaultSaverStatus): string | null {
+  return status.state === 'error' ? status.error.message : null;
+}
+
 export function FinanceProvider({
   children,
-  dataKey,
-  userId,
+  store,
+  renderLoadError,
 }: {
   children: ReactNode;
-  dataKey: CryptoKey;
-  userId: string;
+  /** Vault storage of the session. Mount one FinanceProvider per user (key by user id). */
+  store: VaultStore;
+  /** Screen shown when the vault exists but does not open. Nothing is ever saved in that state. */
+  renderLoadError?: (actions: VaultLoadErrorActions) => ReactNode;
 }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cardAccounts, setCardAccounts] = useState<CardAccount[]>([]);
   const [storedCardPurchases, setStoredCardPurchases] = useState<CardPurchase[]>([]);
   const [storedInvoices, setStoredInvoices] = useState<CardInvoice[]>([]);
   const [rules, setRules] = useState<CategoryRule[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [saver] = useState(() => createVaultSaver(store));
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const storeRef = useRef(store);
+  const loaded = loadState.status === 'ready';
 
-  // Load vault data on mount
+  const applyData = useCallback((data: Record<string, unknown>, backupShape = false) => {
+    setTransactions(safeArray(data.transactions));
+    setCardAccounts(safeArray(data.cards));
+    setStoredCardPurchases(safeArray(backupShape ? data.cardPurchases : data.card_purchases));
+    setStoredInvoices(safeArray(data.invoices));
+    if (!backupShape || data.rules !== undefined) setRules(safeArray(data.rules));
+  }, []);
+
+  // Load the vault once per mount (or per explicit retry). A new store for the same
+  // user (recovery kit renewal re-encrypts the vault with a new key) must not reload:
+  // the in-memory state is current and the saver writes it through the new store.
   useEffect(() => {
     let cancelled = false;
-    loadVaultData(userId, dataKey).then(data => {
-      if (cancelled) return;
-      setTransactions(safeArray(data.transactions));
-      setCardAccounts(safeArray(data.cards));
-      setStoredCardPurchases(safeArray(data.card_purchases));
-      setStoredInvoices(safeArray(data.invoices));
-      setRules(safeArray(data.rules));
-      setLoaded(true);
-    });
+    storeRef.current.load().then(
+      data => {
+        if (cancelled) return;
+        applyData(data);
+        setLoadState({ status: 'ready' });
+      },
+      (err: unknown) => {
+        if (cancelled) return;
+        // Never mark as loaded: the persist effect below only saves when loaded.
+        setLoadState({
+          status: 'error',
+          error: err instanceof Error ? err : new Error('Não foi possível abrir os dados.'),
+        });
+      },
+    );
     return () => { cancelled = true; };
-  }, [userId, dataKey]);
-
-  // Persist vault data on changes (debounced)
-  const persistVault = useCallback(() => {
-    if (!loaded) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      saveVaultData(userId, dataKey, {
-        transactions,
-        cards: cardAccounts,
-        card_purchases: storedCardPurchases,
-        invoices: storedInvoices,
-        rules,
-      });
-    }, 300);
-  }, [loaded, userId, dataKey, transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
+  }, [loadAttempt, applyData]);
 
   useEffect(() => {
-    persistVault();
-  }, [persistVault]);
+    storeRef.current = store;
+    saver.setStore(store);
+  }, [saver, store]);
+
+  useEffect(() => saver.subscribe(status => setSaveError(saveErrorMessage(status))), [saver]);
+
+  // Cloud: newer data from another device reached this device. Apply it only when
+  // nothing here is waiting to be saved and nothing changed while it was read;
+  // otherwise the local edits are saved on their old base and the sync reports a
+  // conflict instead of anything being overwritten.
+  useEffect(() => {
+    if (!loaded || !store.subscribeRemote || !store.reloadRemote) return;
+    let active = true;
+    const unsubscribe = store.subscribeRemote(() => {
+      void (async () => {
+        await saver.flush();
+        if (!active || saver.getStatus().state !== 'idle') return;
+        const revision = saver.getRevision();
+        let remote: Awaited<ReturnType<NonNullable<VaultStore['reloadRemote']>>> = null;
+        try {
+          remote = await store.reloadRemote!();
+        } catch {
+          return; // unreadable: keep what is on screen; the sync already reported it
+        }
+        if (!active || !remote || saver.getRevision() !== revision) return;
+        remote.accept();
+        applyData(remote.data);
+      })();
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [loaded, store, saver, applyData]);
+
+  // Persist vault data on changes (debounced). Only after a successful load.
+  useEffect(() => {
+    if (!loaded) return;
+    saver.schedule({
+      transactions,
+      cards: cardAccounts,
+      card_purchases: storedCardPurchases,
+      invoices: storedInvoices,
+      rules,
+    });
+  }, [loaded, saver, store, transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
+
+  // Pending edits are written, not dropped: when the page is hidden and when the
+  // provider unmounts (sign out, lock). The saver uses the latest store, and a
+  // store whose key is no longer the account's refuses to write.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'hidden') void saver.flush();
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      void saver.flush();
+    };
+  }, [saver]);
+
+  const retrySave = useCallback(() => {
+    void saver.retry();
+  }, [saver]);
+
+  const retryLoad = useCallback(() => {
+    setLoadState({ status: 'loading' });
+    setLoadAttempt(n => n + 1);
+  }, []);
+
+  const restoreBackupOverUnreadable = useCallback(async (json: string) => {
+    const data = JSON.parse(json) as Record<string, unknown>;
+    await store.preserveUnreadable();
+    applyData(data, true);
+    setLoadState({ status: 'ready' });
+  }, [store, applyData]);
 
   const cardInvoices = recalculateInvoices(cardAccounts, storedCardPurchases, storedInvoices);
   const cardPurchases = applyPurchaseStatuses(storedCardPurchases, cardInvoices);
@@ -298,15 +397,8 @@ export function FinanceProvider({
   }, [transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
 
   const importFinanceBackup = useCallback((jsonString: string) => {
-    const data = JSON.parse(jsonString);
-    setTransactions(safeArray(data.transactions));
-    setCardAccounts(safeArray(data.cards));
-    setStoredCardPurchases(safeArray(data.cardPurchases));
-    setStoredInvoices(safeArray(data.invoices));
-    if (data.rules !== undefined) {
-      setRules(safeArray(data.rules));
-    }
-  }, []);
+    applyData(JSON.parse(jsonString), true);
+  }, [applyData]);
 
   const getCardInvoicesByMonth = useCallback(
     (month: string) => cardInvoices.filter(invoice => invoice.paymentMonth === month),
@@ -467,10 +559,23 @@ export function FinanceProvider({
     return Array.from(months).sort().reverse();
   }, [transactions, cardInvoices]);
 
+  if (loadState.status === 'error') {
+    const actions = { error: loadState.error, retry: retryLoad, restoreBackup: restoreBackupOverUnreadable };
+    return renderLoadError ? (
+      <>{renderLoadError(actions)}</>
+    ) : (
+      <div className="flex h-screen items-center justify-center p-6">
+        <p role="alert" className="text-sm text-rose-200">
+          Não foi possível abrir seus dados neste aparelho. Nada foi apagado.
+        </p>
+      </div>
+    );
+  }
+
   if (!loaded) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-sm text-slate-400">Desbloqueando cofre...</p>
+        <p role="status" className="text-sm text-slate-400">Desbloqueando cofre...</p>
       </div>
     );
   }
@@ -503,6 +608,8 @@ export function FinanceProvider({
         getAvailableMonths,
         getCardMonthSnapshot,
         getCardInvoicesByMonth,
+        saveError,
+        retrySave,
       }}
     >
       {children}

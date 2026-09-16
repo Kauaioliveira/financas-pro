@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/useAuth';
-import { recoverWithPhrase } from '../../lib/crypto/crypto';
-import { normalizePhrase } from '../../lib/crypto/wordlist';
 import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 
 export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
@@ -25,12 +23,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
 
     setLoading(true);
     try {
-      const envelope = provider.getEnvelope(selectedUser);
-      if (!envelope) throw new Error('Conta não encontrada.');
-
-      const normalized = normalizePhrase(phrase);
-      const newEnvelope = await recoverWithPhrase(normalized, newPassword, envelope);
-      provider.updateEnvelope(selectedUser, newEnvelope);
+      await provider.recoverWithKit({ userId: selectedUser, phrase, newPassword });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro na recuperação.');
@@ -72,7 +65,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
         >
           <h2 className="text-lg font-semibold text-white">Recuperar conta</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Digite a frase de recuperação que foi gerada na criação da conta.
+            Digite as 12 palavras do seu kit de recuperação, na ordem.
           </p>
 
           {users.length > 1 && (
@@ -97,7 +90,7 @@ export function RecoveryScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
 
           <div className="mt-4">
             <label className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Frase de recuperação
+              Palavras do kit
             </label>
             <textarea
               value={phrase}

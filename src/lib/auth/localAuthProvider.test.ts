@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalAuthProvider } from './localAuthProvider';
 import type { AuthProvider } from './types';
+import { addRecoveryWrap, decryptData, recoverWithPhrase, unlockVault } from '../crypto';
+import { loadVaultData, saveVaultData } from '../../utils/secureStorage';
+
+// See crypto.test.ts: envelopes store their iteration count, so a low count keeps
+// the same code paths without the PBKDF2 cost that made this file time out.
+vi.mock('../crypto/constants', async importOriginal => ({
+  ...(await importOriginal<typeof import('../crypto/constants')>()),
+  PBKDF2_ITERATIONS: 1_000,
+}));
 
 describe('localAuthProvider', () => {
   let provider: AuthProvider;
@@ -187,6 +196,142 @@ describe('localAuthProvider', () => {
       provider.updateEnvelope('nao-existe', envelope);
       expect(provider.listUsers()).toHaveLength(1);
     });
+  });
+});
+
+
+describe('localAuthProvider — kit renewal', () => {
+  const OLD_PHRASE = 'abacate cofre brisa forte janela lago milho navio pedra raiz selva tigre';
+  const VAULT = { transactions: [{ id: 't1', amount: -10 }], cards: [], rules: [] };
+  let provider: AuthProvider;
+
+  async function createAccountWithKitAndVault(withVault = true) {
+    const session = await provider.register('Fulano', 'senhaCerta');
+    const envelope = provider.getEnvelope(session.userId)!;
+    provider.updateEnvelope(session.userId, await addRecoveryWrap(OLD_PHRASE, session.dataKey, envelope));
+    if (withVault) await saveVaultData(session.userId, session.dataKey, VAULT);
+    return session;
+  }
+
+  function snapshotStorage(): Record<string, string | null> {
+    const out: Record<string, string | null> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)!;
+      out[key] = localStorage.getItem(key);
+    }
+    return out;
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    provider = createLocalAuthProvider();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects the wrong password before generating anything', async () => {
+    const session = await createAccountWithKitAndVault();
+    const before = snapshotStorage();
+    await expect(provider.prepareKitRenewal(session.userId, 'senhaErrada')).rejects.toThrow(
+      'Senha incorreta.',
+    );
+    expect(snapshotStorage()).toEqual(before);
+  });
+
+  it('changes nothing when the renewal is prepared but never committed (cancel)', async () => {
+    const session = await createAccountWithKitAndVault();
+    const previousKitId = provider.getEnvelope(session.userId)!.kitId;
+    const before = snapshotStorage();
+
+    const renewal = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+    expect(renewal.phrase.split(' ')).toHaveLength(12);
+    expect(renewal.kitId).toMatch(/^[0-9a-f]{6}$/);
+    expect(renewal.previousKitId).toBe(previousKitId);
+
+    expect(snapshotStorage()).toEqual(before);
+    const signIn = await provider.signIn(session.userId, 'senhaCerta');
+    expect(await loadVaultData(session.userId, signIn.dataKey)).toEqual(VAULT);
+  });
+
+  it('commits a new data key: data preserved, new kit opens, old kit and old key do not', async () => {
+    const session = await createAccountWithKitAndVault();
+    const oldVaultRaw = localStorage.getItem(`financaspro_${session.userId}_vault`)!;
+
+    const renewal = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+    const newKey = await renewal.commit();
+
+    const envelope = provider.getEnvelope(session.userId)!;
+    expect(envelope.kitId).toBe(renewal.kitId);
+    expect(envelope.kitCreatedAt).toBe(renewal.kitCreatedAt);
+
+    const newVaultRaw = localStorage.getItem(`financaspro_${session.userId}_vault`)!;
+    expect(newVaultRaw).not.toBe(oldVaultRaw);
+    expect(await loadVaultData(session.userId, newKey)).toEqual(VAULT);
+    await expect(decryptData(session.dataKey, newVaultRaw)).rejects.toThrow();
+
+    const signIn = await provider.signIn(session.userId, 'senhaCerta');
+    expect(await loadVaultData(session.userId, signIn.dataKey)).toEqual(VAULT);
+
+    await expect(recoverWithPhrase(OLD_PHRASE, 'outraSenha', envelope)).rejects.toThrow(
+      'Frase de recuperação incorreta.',
+    );
+    const recovered = await recoverWithPhrase(renewal.phrase, 'outraSenha', envelope);
+    const recoveredKey = await unlockVault('outraSenha', recovered);
+    expect(JSON.parse(await decryptData(recoveredKey, newVaultRaw))).toEqual(VAULT);
+  });
+
+  it('works for an account without a stored vault and without a previous kit id', async () => {
+    const session = await provider.register('Fulano', 'senhaCerta');
+    const renewal = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+    expect(renewal.previousKitId).toBeNull();
+    await renewal.commit();
+    expect(localStorage.getItem(`financaspro_${session.userId}_vault`)).toBeNull();
+    await expect(provider.signIn(session.userId, 'senhaCerta')).resolves.toBeDefined();
+  });
+
+  it('rolls back the vault when saving the account fails, leaving the old kit and key working', async () => {
+    const session = await createAccountWithKitAndVault();
+    const before = snapshotStorage();
+    const renewal = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'financaspro_accounts') throw new DOMException('cheio', 'QuotaExceededError');
+      realSetItem(key, value);
+    });
+
+    await expect(renewal.commit()).rejects.toThrow(
+      'Não foi possível salvar o kit novo. Nada foi alterado.',
+    );
+    vi.restoreAllMocks();
+
+    expect(snapshotStorage()).toEqual(before);
+    const signIn = await provider.signIn(session.userId, 'senhaCerta');
+    expect(await loadVaultData(session.userId, signIn.dataKey)).toEqual(VAULT);
+    await expect(
+      recoverWithPhrase(OLD_PHRASE, 'outraSenha', provider.getEnvelope(session.userId)!),
+    ).resolves.toBeDefined();
+  });
+
+  it('refuses to commit twice', async () => {
+    const session = await createAccountWithKitAndVault();
+    const renewal = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+    await renewal.commit();
+    await expect(renewal.commit()).rejects.toThrow('Este kit já foi salvo.');
+  });
+
+  it('does not commit when the vault changed to something the current key cannot read', async () => {
+    const session = await createAccountWithKitAndVault();
+    const renewal = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+    // Simulates another tab renewing the kit in between: the vault now uses a key we do not hold.
+    const other = await provider.prepareKitRenewal(session.userId, 'senhaCerta');
+    await other.commit();
+    const afterOther = snapshotStorage();
+
+    await expect(renewal.commit()).rejects.toThrow(/O kit não foi trocado/);
+    expect(snapshotStorage()).toEqual(afterOther);
   });
 });
 

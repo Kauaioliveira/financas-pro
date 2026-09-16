@@ -1,0 +1,11 @@
+// Cloudflare Workers: static assets only (no Worker script), so public/_headers applies.
+// The Worker name in the dashboard must be the same as "name". Guide: docs/deploy/cloudflare.md
+{
+  "name": "financaspro",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    // Unknown paths serve index.html: the app is a single-page application.
+    "not_found_handling": "single-page-application"
+  }
+}
