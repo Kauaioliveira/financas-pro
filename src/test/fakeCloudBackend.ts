@@ -1,6 +1,7 @@
 import { CloudError } from '../lib/cloud/errors';
 import type { Feedback } from '../lib/cloud/feedback';
 import type {
+  ConsentRecord,
   CloudAuthEvent,
   CloudBackend,
   CloudUser,
@@ -18,6 +19,8 @@ interface FakeUser {
   authSecret: string;
   displayName: string;
   confirmed: boolean;
+  /** What user_metadata would hold: the record of the accepted documents. */
+  consent: ConsentRecord | null;
 }
 
 /**
@@ -75,13 +78,14 @@ export class FakeCloudServer {
     return new FakeDevice(this);
   }
 
-  createUser(email: string, authSecret: string, displayName: string): FakeUser {
+  createUser(email: string, authSecret: string, displayName: string, consent: ConsentRecord | null = null): FakeUser {
     const user: FakeUser = {
       id: `00000000-0000-4000-8000-${String(nextUserId++).padStart(12, '0')}`,
       email,
       authSecret,
       displayName,
       confirmed: this.autoConfirm,
+      consent,
     };
     this.users.set(email, user);
     return user;
@@ -133,14 +137,24 @@ export class FakeDevice implements CloudBackend {
     return user ? this.toUser(user) : null;
   }
 
-  async signUp({ email, authSecret, displayName }: { email: string; authSecret: string; displayName: string }) {
+  async signUp({
+    email,
+    authSecret,
+    displayName,
+    consent,
+  }: {
+    email: string;
+    authSecret: string;
+    displayName: string;
+    consent: ConsentRecord;
+  }) {
     this.net('signUp');
     if (this.server.allowlist && !this.server.allowlist.has(email)) {
       throw new CloudError('signup-blocked', 'Cadastro fechado: este e-mail ainda não está na lista do beta.');
     }
     const existing = this.server.users.get(email);
     if (existing) return { hasSession: false, user: null };
-    const user = this.server.createUser(email, authSecret, displayName);
+    const user = this.server.createUser(email, authSecret, displayName, consent);
     if (!user.confirmed) return { hasSession: false, user: this.toUser(user) };
     this.sessionEmail = email;
     return { hasSession: true, user: this.toUser(user) };

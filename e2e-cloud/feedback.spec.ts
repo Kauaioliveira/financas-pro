@@ -17,9 +17,11 @@ async function newPage(browser: Browser, server: MockSupabase): Promise<Page> {
 async function createAccount(page: Page, server: MockSupabase) {
   await page.getByRole('button', { name: /criar conta/i }).click();
   await page.getByLabel('Seu nome').fill('Dono');
-  await page.getByLabel('E-mail').fill(EMAIL);
+  await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Confirmar senha').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /li e aceito os termos do beta/i }).check();
+  await page.getByRole('checkbox', { name: /transferência internacional/i }).check();
   await page.getByRole('button', { name: /^criar conta$/i }).click();
   await expect(page.getByRole('heading', { name: /confirme seu e-mail/i })).toBeVisible();
   server.confirm(EMAIL);

@@ -161,8 +161,8 @@ Faça em janela anônima, com o site rodando (`npm run dev` com o `.env.local`, 
 2. Digitar a senha → **Configurar cofre** → imprimir o kit → confirmar as 3 palavras.
 3. Escolher **Começar com um backup** → informar o arquivo do passo "Antes de tudo" → conferir o painel.
 4. Abrir em outro navegador ou no celular → entrar → ver os mesmos dados.
-5. Editar nos dois aparelhos quase ao mesmo tempo → o app deve perguntar qual versão manter.
-   Nada pode sumir sem você escolher.
+5. Editar nos dois aparelhos quase ao mesmo tempo → as alterações dos dois devem aparecer juntas,
+   com o aviso "Juntamos alterações de outro aparelho". Nada pode sumir.
 6. Desligar a internet → editar → aparece "sem sincronizar" → religar → os dados sobem.
 7. **Esqueci a senha** → link do e-mail → nova senha → digitar o kit → dados de volta. Peça e abra o
    link **no mesmo navegador**: o fluxo PKCE guarda ali o verificador, e o link falha em outro aparelho.
@@ -170,8 +170,30 @@ Faça em janela anônima, com o site rodando (`npm run dev` com o `.env.local`, 
    digitar o kit **antigo**: o app deve avisar que ele só abre uma cópia antiga (com a data) e pedir
    confirmação antes de restaurá-la. Cancele e use o kit **novo**: ele abre os dados atuais.
 9. Tentar criar conta com um e-mail fora da allowlist → deve ser recusado.
+10. **Dar opinião** no topo do app → enviar → conferir a linha em Table Editor → `feedback`
+    (o texto, a tela e a versão do app; nada de valores).
+11. Abrir **Política de privacidade** e **Termos do beta** pelo rodapé do login: não pode sobrar
+    nenhum trecho entre colchetes (veja a seção 9).
 
 Passou tudo? Repita as seções 1 a 7 no projeto de produção.
+
+## 9. Antes de convidar outras pessoas: preencher os textos legais
+
+Os textos de privacidade e dos termos estão em `src/lib/legal/documents.ts` e já são exibidos no
+app, mas duas informações dependem de você:
+
+| Constante | O que colocar |
+|---|---|
+| `CONTROLLER_NAME` | O nome de quem responde pelos dados (você ou a sua empresa). |
+| `CONTACT_EMAIL` | O endereço que vai receber pedidos de acesso, correção e exclusão. Pode ser o Gmail do beta. |
+
+Enquanto eles não forem trocados, as páginas mostram um aviso em amarelo dizendo que faltam dados —
+os testadores veem esse aviso. Troque as duas constantes, confira as promessas do texto (prazo de
+resposta de 15 dias, aviso de 30 dias antes de encerrar o beta) e publique de novo.
+
+Ao mudar o texto, atualize também `LEGAL_VERSION`: é essa versão que fica gravada junto de cada
+conta, em `user_metadata` (`consent_version`, `consent_terms_at`, `consent_intl_transfer_at`), como
+registro do aceite. **Nenhuma migração nova é necessária.**
 
 ## Se algo der errado
 
@@ -191,7 +213,9 @@ Passou tudo? Repita as seções 1 a 7 no projeto de produção.
 - **Pausa por inatividade:** o Free pausa após 7 dias com pouca atividade e manda e-mail antes.
   Usar o app evita. Se pausar: painel → **Resume project** (há até 1 ano para isso).
 - **Backups:** o plano Free não faz backup automático. Exporte um backup no app de vez em quando.
-- **Convidar alguém:** `insert into public.beta_allowlist (email) values ('amigo@exemplo.com');`
+- **Convidar alguém:** só depois da seção 9. Depois,
+  `insert into public.beta_allowlist (email) values ('amigo@exemplo.com');`
+- **Ler as opiniões:** Table Editor → `feedback` (o app só escreve nessa tabela; ninguém lê por ele).
 - **Excluir uma conta a pedido:** Authentication → Users → apagar o usuário. Cofre, históricos e
   opiniões somem em cascata.
 - **Se alguém sobrescrever suas chaves** (por exemplo, depois de tomar seu e-mail): troque a senha do

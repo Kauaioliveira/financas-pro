@@ -217,7 +217,8 @@ Senha --------+--> PBKDF2-SHA256 (600k iterações) --> master
 - **Dois aparelhos editando ao mesmo tempo** têm as alterações juntadas por registro. Quando os dois mudam o mesmo registro fica o deste aparelho, e o app avisa quantos casos assim houve.
 - O **histórico de chaves** guarda no mínimo 30 dias (depois disso, as 10 versões mais recentes) e recusa mais de **20 trocas de chave em 24 horas**.
 - **Dar opinião** manda para o dono apenas o texto que você escrever, o nome da tela e a versão do app. Nenhum dado financeiro sai do aparelho.
-- Ainda **não existem** página de privacidade/termos e telas de consentimento. **Não convide outras pessoas para o beta nesta etapa.**
+- **Política de privacidade** e **termos do beta** ficam dentro do app, no rodapé do login e em Configurações (`#/privacidade` e `#/termos`). O cadastro exige duas caixas separadas: uma para os dois documentos e outra, em destaque, para a **transferência internacional** dos dados da conta.
+- Antes de convidar alguém, o dono precisa preencher o nome do responsável e o e-mail de contato em `src/lib/legal/documents.ts`. Enquanto isso não acontecer, as páginas avisam em amarelo que faltam dados.
 
 ## Arquitetura
 

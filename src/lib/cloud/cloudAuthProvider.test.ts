@@ -6,6 +6,7 @@ import { decryptVault } from './vaultCrypto';
 import { FakeCloudServer } from '../../test/fakeCloudBackend';
 import type { FakeDevice } from '../../test/fakeCloudBackend';
 import { MemoryStorage } from '../../test/memoryStorage';
+import { LEGAL_VERSION } from '../legal/documents';
 import type { AuthSession, SignInResult } from '../auth/types';
 
 vi.mock('../crypto/constants', async importOriginal => ({
@@ -16,6 +17,8 @@ vi.mock('../crypto/constants', async importOriginal => ({
 
 const EMAIL = 'dono@exemplo.com';
 const PASSWORD = 'girafa azul come pastel';
+/** The two boxes of the sign-up, ticked. */
+const CONSENT = { terms: true, internationalTransfer: true };
 const DATA = { transactions: [{ id: 't1', description: 'Padaria São João', amount: -12.5 }], rules: [] };
 
 interface Device {
@@ -56,7 +59,7 @@ function unlocked(result: SignInResult): AuthSession {
 /** Creates the account, confirms the e-mail and sets up the vault on device A. */
 async function setUpAccount(server: FakeCloudServer, initial: Record<string, unknown> = DATA) {
   const a = device(server).use();
-  expect(await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD })).toEqual({
+  expect(await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT })).toEqual({
     status: 'needs-email-confirmation',
     email: EMAIL,
   });
@@ -94,7 +97,7 @@ describe('cloud sign-up and vault setup', () => {
     const server = new FakeCloudServer();
     await setUpAccount(server);
     const other = device(server).use();
-    expect(await other.provider.signUp({ displayName: 'Outro', email: EMAIL, password: 'outra senha bem longa' })).toEqual({
+    expect(await other.provider.signUp({ displayName: 'Outro', email: EMAIL, password: 'outra senha bem longa', consent: CONSENT })).toEqual({
       status: 'needs-email-confirmation',
       email: EMAIL,
     });
@@ -103,20 +106,46 @@ describe('cloud sign-up and vault setup', () => {
   it('checks the password rule before any network call', async () => {
     const server = new FakeCloudServer();
     const a = device(server).use();
-    await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: 'curta' })).rejects.toThrow(
+    await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: 'curta', consent: CONSENT })).rejects.toThrow(
       /12 caracteres/,
     );
-    await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: 'senha1234567' })).rejects.toThrow(
+    await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: 'senha1234567', consent: CONSENT })).rejects.toThrow(
       /muito comum/,
     );
     expect(server.calls).toEqual([]);
+  });
+
+  it('records the accepted documents with the account', async () => {
+    const server = new FakeCloudServer();
+    const a = device(server).use();
+    await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT });
+    const consent = server.users.get(EMAIL)!.consent!;
+    expect(consent.version).toBe(LEGAL_VERSION);
+    expect(Date.parse(consent.termsAcceptedAt)).not.toBeNaN();
+    expect(consent.internationalTransferAcceptedAt).toBe(consent.termsAcceptedAt);
+  });
+
+  it('refuses to create the account without both consents, before any network call', async () => {
+    const server = new FakeCloudServer();
+    const a = device(server).use();
+    for (const consent of [
+      { terms: false, internationalTransfer: false },
+      { terms: true, internationalTransfer: false },
+      { terms: false, internationalTransfer: true },
+    ]) {
+      await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent })).rejects.toThrow(
+        /marque as duas caixas/i,
+      );
+    }
+    expect(server.calls).toEqual([]);
+    expect(server.users.size).toBe(0);
   });
 
   it('shows the allowlist message when the e-mail is not in the beta', async () => {
     const server = new FakeCloudServer();
     server.allowlist = new Set(['outro@exemplo.com']);
     const a = device(server).use();
-    await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD })).rejects.toThrow(
+    await expect(a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT })).rejects.toThrow(
       /lista do beta/,
     );
   });
@@ -124,7 +153,7 @@ describe('cloud sign-up and vault setup', () => {
   it('refuses to set up a vault twice (edge: other device was faster)', async () => {
     const server = new FakeCloudServer();
     const a = device(server).use();
-    await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD });
+    await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT });
     server.confirm(EMAIL);
     await a.provider.signIn({ email: EMAIL, password: PASSWORD });
     const setupA = await a.provider.prepareVaultSetup();

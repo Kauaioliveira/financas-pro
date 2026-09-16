@@ -15,6 +15,8 @@ vi.mock('../crypto/constants', async importOriginal => ({
 
 const EMAIL = 'dono@exemplo.com';
 const PASSWORD = 'girafa azul come pastel';
+/** The two boxes of the sign-up, ticked. */
+const CONSENT = { terms: true, internationalTransfer: true };
 const NEW_PASSWORD = 'pastel de vento na feira';
 const DATA = { transactions: [{ id: 't1', description: 'Padaria' }], rules: [] };
 
@@ -59,7 +61,7 @@ function unlocked(result: SignInResult | RecoveryResult): AuthSession {
 async function account() {
   const server = new FakeCloudServer();
   const a = device(server).use();
-  await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD });
+  await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT });
   server.confirm(EMAIL);
   await a.provider.signIn({ email: EMAIL, password: PASSWORD });
   const setup = await a.provider.prepareVaultSetup();

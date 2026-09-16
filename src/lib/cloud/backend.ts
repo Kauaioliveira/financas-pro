@@ -61,6 +61,18 @@ export interface VaultHistoryRow {
   createdAt: string;
 }
 
+/**
+ * What the person accepted at sign-up, kept with the account as a record only
+ * (never used to authorize anything). No new column: it goes in the user metadata.
+ */
+export interface ConsentRecord {
+  /** Version of the documents that were on screen. */
+  version: string;
+  termsAcceptedAt: string;
+  /** Separate acceptance, in evidence, of the international transfer (LGPD art. 33, VIII). */
+  internationalTransferAcceptedAt: string;
+}
+
 export interface CloudUser {
   id: string;
   email: string;
@@ -89,6 +101,7 @@ export interface CloudBackend {
     authSecret: string;
     displayName: string;
     redirectTo: string;
+    consent: ConsentRecord;
   }): Promise<{ hasSession: boolean; user: CloudUser | null }>;
   signIn(email: string, authSecret: string): Promise<CloudUser>;
   signOut(): Promise<void>;

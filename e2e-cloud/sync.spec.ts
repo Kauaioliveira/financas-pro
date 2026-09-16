@@ -19,7 +19,7 @@ async function newDevice(browser: Browser, server: MockSupabase): Promise<Device
 }
 
 async function signIn(page: Page) {
-  await page.getByLabel('E-mail').fill(EMAIL);
+  await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: /^entrar$/i }).click();
   await expect(page.getByText(/central financeira/i)).toBeVisible({ timeout: 20_000 });
@@ -28,9 +28,11 @@ async function signIn(page: Page) {
 async function createAccountWithEmptyVault(page: Page, server: MockSupabase) {
   await page.getByRole('button', { name: /criar conta/i }).click();
   await page.getByLabel('Seu nome').fill('Dono');
-  await page.getByLabel('E-mail').fill(EMAIL);
+  await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Confirmar senha').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /li e aceito os termos do beta/i }).check();
+  await page.getByRole('checkbox', { name: /transferência internacional/i }).check();
   await page.getByRole('button', { name: /^criar conta$/i }).click();
   await expect(page.getByRole('heading', { name: /confirme seu e-mail/i })).toBeVisible();
   server.confirm(EMAIL);

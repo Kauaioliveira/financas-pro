@@ -18,6 +18,8 @@ vi.mock('../crypto/constants', async importOriginal => ({
 
 const EMAIL = 'dono@exemplo.com';
 const PASSWORD = 'girafa azul come pastel';
+/** The two boxes of the sign-up, ticked. */
+const CONSENT = { terms: true, internationalTransfer: true };
 const BASE = { transactions: [{ id: 't1', description: 'Mercado' }], rules: [] };
 
 // Tests share one global localStorage and swap it per "device". Always let a device's
@@ -62,7 +64,7 @@ function unlocked(result: SignInResult): AuthSession {
 async function twoDevices() {
   const server = new FakeCloudServer();
   const a = device(server).use();
-  await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD });
+  await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT });
   server.confirm(EMAIL);
   await a.provider.signIn({ email: EMAIL, password: PASSWORD });
   const sessionA = await (await a.provider.prepareVaultSetup()).commit(BASE);
@@ -115,7 +117,7 @@ describe('sync: push', () => {
   it('two devices re-saving a new empty vault in the app shape do not conflict (edge)', async () => {
     const server = new FakeCloudServer();
     const a = device(server).use();
-    await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD });
+    await a.provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT });
     server.confirm(EMAIL);
     await a.provider.signIn({ email: EMAIL, password: PASSWORD });
     const sessionA = await (await a.provider.prepareVaultSetup()).commit({});

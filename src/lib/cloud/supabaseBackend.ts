@@ -110,11 +110,20 @@ export function createSupabaseBackend(client: SupabaseClient): CloudBackend {
       return toCloudUser(data.session.user);
     },
 
-    async signUp({ email, authSecret, displayName, redirectTo }) {
+    async signUp({ email, authSecret, displayName, redirectTo, consent }) {
       const { data, error } = await client.auth.signUp({
         email,
         password: authSecret,
-        options: { emailRedirectTo: redirectTo, data: { display_name: displayName } },
+        options: {
+          emailRedirectTo: redirectTo,
+          // user_metadata: a record of the acceptance, never read to authorize anything.
+          data: {
+            display_name: displayName,
+            consent_version: consent.version,
+            consent_terms_at: consent.termsAcceptedAt,
+            consent_intl_transfer_at: consent.internationalTransferAcceptedAt,
+          },
+        },
       });
       if (error) throw toCloudAuthError(error, 'sign-up');
       return { hasSession: data.session !== null, user: data.user ? toCloudUser(data.user) : null };

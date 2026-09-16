@@ -152,6 +152,13 @@ stateDiagram-v2
 | `mergeVault.ts` | Fusão em 3 vias por `id` (e só `paid` nas faturas), com contagem de conflitos |
 | `passwordPolicy.ts` | Regra de senha do modo nuvem (mínimo 12, lista de senhas comuns, não conter o e-mail) |
 | `feedback.ts` | Tipos e validação da opinião dos testadores (tipo, mensagem de até 2.000, tela, versão) |
+
+### Textos legais (`src/lib/legal/`)
+
+| Arquivo | Responsabilidade |
+|---------|-----------------|
+| `documents.ts` | Texto da política de privacidade e dos termos do beta, versão do aceite e marcadores que o dono precisa preencher |
+| `routes.ts` | Endereços das páginas (`#/privacidade`, `#/termos`), separados do texto para as telas do modo local |
 | `errors.ts` | `CloudError` com mensagem pronta em português |
 
 ### Contextos React (`src/context/`)
@@ -192,6 +199,8 @@ stateDiagram-v2
 | `components/VaultLoadErrorScreen.tsx` | Cofre que não abre: tentar de novo, sair, restaurar backup |
 | `components/SyncBadge.tsx` / `SyncConflictDialog.tsx` | Estado da sincronização e escolha de versão quando a fusão não resolve |
 | `components/cloud/FeedbackDialog.tsx` | "Dar opinião" do beta: tipo, mensagem, tela e versão; sem nada do cofre |
+| `components/cloud/LegalPage.tsx` | Política de privacidade e termos do beta (`#/privacidade`, `#/termos`) |
+| `components/LegalLinks.tsx` | Links para as duas páginas, no rodapé do login e em Configurações |
 | `components/Dashboard.tsx`, `ImportStatement.tsx`, `CardStatementImport.tsx`, `TransactionList.tsx`, `CreditCardView.tsx`, `CategoryRules.tsx`, `SettingsModal.tsx`, `Sidebar.tsx` | Telas do app |
 
 ## Sincronização (modo nuvem)

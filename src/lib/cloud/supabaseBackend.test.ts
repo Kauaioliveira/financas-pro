@@ -4,6 +4,13 @@ import { createSupabaseBackend, toCloudAuthError, toCloudDataError } from './sup
 
 type Result = { data: unknown; error: unknown };
 
+/** Record of the accepted documents, kept in user_metadata. */
+const CONSENT = {
+  version: '2026-09-15',
+  termsAcceptedAt: '2026-09-15T12:00:00.000Z',
+  internationalTransferAcceptedAt: '2026-09-15T12:00:00.000Z',
+};
+
 /** Just enough of the supabase-js surface, returning its documented { data, error } shapes. */
 function fakeClient(overrides: {
   rpc?: (name: string, args: Record<string, unknown>) => Result | Promise<Result>;
@@ -109,13 +116,21 @@ describe('supabaseBackend auth calls', () => {
     const signUp = vi.fn(async () => ({ data: { user: { id: 'u1', email: 'a@b.c', user_metadata: { display_name: 'Ana' } }, session: null }, error: null }));
     const { client } = fakeClient({ auth: { signUp } });
     const result = await createSupabaseBackend(client).signUp({
-      email: 'a@b.c', authSecret: 'x'.repeat(43), displayName: 'Ana', redirectTo: 'https://app.test/',
+      email: 'a@b.c', authSecret: 'x'.repeat(43), displayName: 'Ana', redirectTo: 'https://app.test/', consent: CONSENT,
     });
     expect(result).toEqual({ hasSession: false, user: { id: 'u1', email: 'a@b.c', displayName: 'Ana' } });
     expect(signUp).toHaveBeenCalledWith({
       email: 'a@b.c',
       password: 'x'.repeat(43),
-      options: { emailRedirectTo: 'https://app.test/', data: { display_name: 'Ana' } },
+      options: {
+        emailRedirectTo: 'https://app.test/',
+        data: {
+          display_name: 'Ana',
+          consent_version: CONSENT.version,
+          consent_terms_at: CONSENT.termsAcceptedAt,
+          consent_intl_transfer_at: CONSENT.internationalTransferAcceptedAt,
+        },
+      },
     });
   });
 
@@ -126,7 +141,7 @@ describe('supabaseBackend auth calls', () => {
     });
     const { client } = fakeClient({ auth: { signUp } });
     await expect(
-      createSupabaseBackend(client).signUp({ email: 'a@b.c', authSecret: 's', displayName: 'A', redirectTo: '' }),
+      createSupabaseBackend(client).signUp({ email: 'a@b.c', authSecret: 's', displayName: 'A', redirectTo: '', consent: CONSENT }),
     ).rejects.toThrow(/lista do beta/);
   });
 

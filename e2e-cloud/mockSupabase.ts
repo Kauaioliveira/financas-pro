@@ -14,6 +14,8 @@ interface MockUser {
   password: string;
   confirmed: boolean;
   displayName: string;
+  /** Everything the app sent in options.data, including the consent record. */
+  metadata: Record<string, unknown>;
 }
 
 export interface MockVault {
@@ -77,7 +79,7 @@ export class MockSupabase {
       role: 'authenticated',
       email: user.email,
       email_confirmed_at: user.confirmed ? new Date().toISOString() : null,
-      user_metadata: { display_name: user.displayName },
+      user_metadata: { ...user.metadata, display_name: user.displayName },
       app_metadata: { provider: 'email' },
       identities: [{ id: user.id, provider: 'email' }],
       created_at: new Date().toISOString(),
@@ -172,6 +174,7 @@ export class MockSupabase {
       const user: MockUser = {
         id: crypto.randomUUID(), email, password: body.password, confirmed: false,
         displayName: body.data?.display_name ?? '',
+        metadata: (body.data ?? {}) as Record<string, unknown>,
       };
       this.users.set(email, user);
       return json(200, this.userJson(user));

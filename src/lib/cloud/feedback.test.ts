@@ -13,6 +13,8 @@ vi.mock('../crypto/constants', async importOriginal => ({
 
 const EMAIL = 'dono@exemplo.com';
 const PASSWORD = 'girafa azul come pastel';
+/** The two boxes of the sign-up, ticked. */
+const CONSENT = { terms: true, internationalTransfer: true };
 
 describe('prepareFeedback', () => {
   it('trims the message and keeps the screen and the version', () => {
@@ -61,7 +63,7 @@ describe('sendFeedback', () => {
     vi.stubGlobal('localStorage', new MemoryStorage());
     const provider = createCloudAuthProvider({ backend: server.device(), siteUrl: 'https://app.test/' });
     providers.push(provider);
-    await provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD });
+    await provider.signUp({ displayName: 'Dono', email: EMAIL, password: PASSWORD, consent: CONSENT });
     server.confirm(EMAIL);
     await provider.signIn({ email: EMAIL, password: PASSWORD });
     await (await provider.prepareVaultSetup()).commit({ transactions: [] });

@@ -22,6 +22,7 @@ import type { AccountKdf, CloudBackend, CloudUser, KitWrap, PasswordWrap, VaultR
 import { createCloudVaultStore } from './cloudVaultStore';
 import { CloudError, isCloudError } from './errors';
 import type { Feedback } from './feedback';
+import { LEGAL_VERSION } from '../legal/documents';
 import { checkCloudPassword } from './passwordPolicy';
 import { createSyncEngine } from './syncEngine';
 import type { ConflictChoice, SyncEngine } from './syncEngine';
@@ -75,6 +76,8 @@ export interface CloudSignUpInput {
   displayName: string;
   email: string;
   password: string;
+  /** The two boxes of the sign-up, ticked separately (docs §8). Both are required. */
+  consent: { terms: boolean; internationalTransfer: boolean };
 }
 
 /** A kit generated for a new vault. Nothing is sent until commit(). */
@@ -482,19 +485,28 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
       };
     },
 
-    async signUp({ displayName, email, password }) {
+    async signUp({ displayName, email, password, consent }) {
       const emailNorm = normalizeEmail(email);
       if (!displayName.trim()) throw new Error('Digite seu nome.');
       if (!EMAIL_PATTERN.test(emailNorm)) throw new Error('Digite um e-mail válido.');
       const rule = checkCloudPassword(password, emailNorm);
       if (rule) throw new Error(rule);
+      if (!consent?.terms || !consent.internationalTransfer) {
+        throw new Error('Para criar a conta, marque as duas caixas de consentimento.');
+      }
 
       const keys = await deriveAccountKeys(emailNorm, password);
+      const acceptedAt = now().toISOString();
       const { hasSession, user } = await backend.signUp({
         email: emailNorm,
         authSecret: keys.authSecret,
         displayName: displayName.trim(),
         redirectTo: siteUrl,
+        consent: {
+          version: LEGAL_VERSION,
+          termsAcceptedAt: acceptedAt,
+          internationalTransferAcceptedAt: acceptedAt,
+        },
       });
       if (!hasSession || !user) {
         // Same answer whether the e-mail is new or already registered (no enumeration).
