@@ -4,6 +4,7 @@ import {
   KeyRound, Eye, EyeOff, Loader2, Shield,
 } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
+import { LegalLinks } from './LegalLinks';
 import { RecoveryKitSettings } from './RecoveryKitSettings';
 import { BackupSettings } from './BackupSettings';
 
@@ -216,6 +217,16 @@ export function SettingsModal({
 
             {(exportData || importData) && (
               <BackupSettings exportData={exportData} importData={importData} />
+            )}
+
+            {__FINANCASPRO_CLOUD__ && (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Beta e privacidade</p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                  O que o servidor guarda, onde ficam os dados e como pedir a exclusão.
+                </p>
+                <LegalLinks className="mt-3" />
+              </div>
             )}
           </div>
 

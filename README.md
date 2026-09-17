@@ -204,7 +204,7 @@ Senha --------+--> PBKDF2-SHA256 (600k iterações) --> master
 - Não é open banking: não conecta diretamente ao seu banco.
 - **No modo local, não envia nada a servidor nenhum.** No modo nuvem, envia apenas texto cifrado que o servidor não consegue abrir.
 - Não recupera dados automaticamente por e-mail: o e-mail devolve só o acesso à conta.
-- Não funde alterações de dois aparelhos automaticamente: em caso de conflito, você escolhe qual versão fica.
+- Não resolve sozinho toda edição simultânea: o app junta as alterações dos dois aparelhos por registro, mas quando os dois mudaram o mesmo registro fica o deste aparelho, e quando a fusão não é possível você escolhe qual versão fica.
 - Não permite trocar o e-mail de uma conta.
 - Não protege contra malware com acesso total ao navegador em execução.
 
@@ -214,9 +214,11 @@ Senha --------+--> PBKDF2-SHA256 (600k iterações) --> master
 - **Trocar o e-mail da conta quebra o login**, porque o salt da senha deriva do e-mail.
 - O **plano grátis do Supabase pausa o projeto** depois de dias sem uso. Nada é apagado: é preciso reativar no painel.
 <!-- VERIFICAR: o prazo exato da pausa (o guia do Supabase diz 7 dias) vem do relatório de pesquisa, não de um projeto em uso; confirme no painel antes de prometer um número. -->
-- **Conflito entre dois aparelhos** é resolvido por escolha sua, sem fusão automática.
+- **Dois aparelhos editando ao mesmo tempo** têm as alterações juntadas por registro. Quando os dois mudam o mesmo registro fica o deste aparelho, e o app avisa quantos casos assim houve.
 - O **histórico de chaves** guarda no mínimo 30 dias (depois disso, as 10 versões mais recentes) e recusa mais de **20 trocas de chave em 24 horas**.
-- Ainda **não existem** tela de opinião, página de privacidade/termos e telas de consentimento. **Não convide outras pessoas para o beta nesta etapa.**
+- **Dar opinião** manda para o dono apenas o texto que você escrever, o nome da tela e a versão do app. Nenhum dado financeiro sai do aparelho.
+- **Política de privacidade** e **termos do beta** ficam dentro do app, no rodapé do login e em Configurações (`#/privacidade` e `#/termos`). O cadastro exige duas caixas separadas: uma para os dois documentos e outra, em destaque, para a **transferência internacional** dos dados da conta.
+- Antes de convidar alguém, o dono precisa preencher o nome do responsável e o e-mail de contato em `src/lib/legal/documents.ts`. Enquanto isso não acontecer, as páginas avisam em amarelo que faltam dados.
 
 ## Arquitetura
 

@@ -19,7 +19,7 @@ async function newDevice(browser: Browser, server: MockSupabase): Promise<Device
 }
 
 async function signIn(page: Page) {
-  await page.getByLabel('E-mail').fill(EMAIL);
+  await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: /^entrar$/i }).click();
   await expect(page.getByText(/central financeira/i)).toBeVisible({ timeout: 20_000 });
@@ -28,9 +28,11 @@ async function signIn(page: Page) {
 async function createAccountWithEmptyVault(page: Page, server: MockSupabase) {
   await page.getByRole('button', { name: /criar conta/i }).click();
   await page.getByLabel('Seu nome').fill('Dono');
-  await page.getByLabel('E-mail').fill(EMAIL);
+  await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Confirmar senha').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /li e aceito os termos do beta/i }).check();
+  await page.getByRole('checkbox', { name: /transferência internacional/i }).check();
   await page.getByRole('button', { name: /^criar conta$/i }).click();
   await expect(page.getByRole('heading', { name: /confirme seu e-mail/i })).toBeVisible();
   server.confirm(EMAIL);
@@ -75,8 +77,8 @@ async function twoDevices(browser: Browser) {
   return { server, a, b };
 }
 
-/** A edits offline while B edits and syncs; A comes back and hits the conflict. */
-async function makeConflict(browser: Browser) {
+/** A edits offline while B edits and syncs. Nothing was sent by A yet. */
+async function bothEdited(browser: Browser) {
   const ctx = await twoDevices(browser);
   const { server, a, b } = ctx;
 
@@ -92,13 +94,37 @@ async function makeConflict(browser: Browser) {
   await b.page.getByTitle('Remover regra').first().click();
   await b.page.getByTitle('Salvar regras').click();
   await waitForPush(server, versionBeforeB);
-  const versionAfterB = cloudVersion(server);
+  const rulesOnB = await b.page.getByTitle('Remover regra').count();
 
+  return { ...ctx, rulesOnA, rulesOnB, versionAfterB: cloudVersion(server) };
+}
+
+/** Back online with A's edits pending. */
+async function comeBackOnline({ server, a }: { server: MockSupabase; a: Device }) {
   server.offline.delete(a.context);
   await a.page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect(a.page.getByRole('dialog', { name: /dados alterados em dois aparelhos/i })).toBeVisible({ timeout: 15_000 });
-  expect([...server.vaults.values()][0].version).toBe(versionAfterB); // nothing was overwritten
-  return { ...ctx, rulesOnA };
+}
+
+/**
+ * Forgets the base of the merge in the cache of this device, as a cache written by an
+ * older version of the app would look. Then the conflict goes back to the manual choice.
+ */
+async function forgetMergeBase(page: Page) {
+  await page.evaluate(() => {
+    const entry = Object.entries(localStorage).find(([key]) => key.startsWith('financaspro_cloud_') && key.endsWith('_vault'));
+    if (!entry) throw new Error('cache da nuvem não encontrado neste aparelho');
+    localStorage.setItem(entry[0], JSON.stringify({ ...JSON.parse(entry[1]), baseCiphertext: null }));
+  });
+}
+
+/** A edits offline, B saves, and this device cannot merge: the choice is asked. */
+async function makeConflict(browser: Browser) {
+  const ctx = await bothEdited(browser);
+  await forgetMergeBase(ctx.a.page);
+  await comeBackOnline(ctx);
+  await expect(ctx.a.page.getByRole('dialog', { name: /dados alterados em dois aparelhos/i })).toBeVisible({ timeout: 15_000 });
+  expect(cloudVersion(ctx.server)).toBe(ctx.versionAfterB); // nothing was overwritten
+  return ctx;
 }
 
 test.describe('Nuvem: sincronização entre aparelhos', () => {
@@ -111,6 +137,27 @@ test.describe('Nuvem: sincronização entre aparelhos', () => {
 
     await a.page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(a.page.getByTitle('Remover regra')).toHaveCount(count, { timeout: 15_000 });
+  });
+
+  test('dois aparelhos editando ao mesmo tempo: as alterações se juntam sozinhas', async ({ browser }) => {
+    const ctx = await bothEdited(browser);
+    const { a, b, rulesOnA, rulesOnB } = ctx;
+
+    await comeBackOnline(ctx);
+
+    // The badge announces it too, so the notice on the page is the last one.
+    const notice = a.page.getByRole('status').filter({ hasText: /juntamos alterações de outro aparelho/i }).last();
+    await expect(notice).toBeVisible({ timeout: 20_000 });
+    await expect(a.page.getByRole('dialog')).toHaveCount(0);
+    await expect(badge(a.page, /^sincronizado/i)).toBeVisible();
+    // Both sets survive: the rules of each device have their own ids.
+    await expect(a.page.getByTitle('Remover regra')).toHaveCount(rulesOnA + rulesOnB, { timeout: 15_000 });
+
+    await notice.getByRole('button', { name: /entendi/i }).click();
+    await expect(a.page.getByRole('button', { name: /entendi/i })).toHaveCount(0);
+
+    await b.page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect(b.page.getByTitle('Remover regra')).toHaveCount(rulesOnA + rulesOnB, { timeout: 15_000 });
   });
 
   test('conflito: "Manter as deste aparelho" pede confirmação e só então sobrescreve a nuvem', async ({ browser }) => {

@@ -41,6 +41,8 @@ async function decryptOrThrow(dataKey: CryptoKey, ciphertext: string): Promise<V
  * `base` is the cloud version the data in memory came from. A save always keeps
  * the oldest base it knows, so edits made on top of old data are sent with the old
  * expected version and end in a conflict instead of overwriting newer cloud data.
+ * The exception is the cache still holding exactly what this store wrote: then the
+ * version it has now is the base, even if the sync pushed it in between.
  */
 export function createCloudVaultStore({ userId, dataKey, onLocalChange, subscribeRemote }: CloudVaultStoreOptions): VaultStore {
   // The password wrap changes whenever the account keys change (password or kit).
@@ -48,6 +50,7 @@ export function createCloudVaultStore({ userId, dataKey, onLocalChange, subscrib
   const wrapAtCreation = safeWrap(userId);
   let base: number | null = null;
   let lastWritten: string | null = null;
+  let lastCiphertext: string | null = null;
 
   function readCache() {
     let cache;
@@ -69,6 +72,7 @@ export function createCloudVaultStore({ userId, dataKey, onLocalChange, subscrib
       const data = await decryptOrThrow(dataKey, cache.ciphertext);
       base = cache.version;
       lastWritten = canonical(data);
+      lastCiphertext = cache.ciphertext;
       return data;
     },
 
@@ -82,11 +86,16 @@ export function createCloudVaultStore({ userId, dataKey, onLocalChange, subscrib
         if (wrapAtCreation === null || cache.pwWrap.wrapped !== wrapAtCreation) {
           throw new VaultSaveError('stale-key', 'As chaves desta conta mudaram. Nada foi gravado com a chave antiga.');
         }
-        const known = base ?? cache.version;
+        const known = cache.ciphertext === lastCiphertext ? cache.version : base ?? cache.version;
         const version = cache.dirty ? Math.min(cache.version, known) : known;
-        return { ...cache, ciphertext, dirty: true, version };
+        // Writing on top of an older version than the cache holds (newer cloud data arrived
+        // and the screen was not reloaded): the vault this edit was made on top of is gone,
+        // so there is no base to merge with and the user decides.
+        const baseCiphertext = version === cache.version ? cache.baseCiphertext : null;
+        return { ...cache, ciphertext, dirty: true, version, baseCiphertext };
       });
       lastWritten = json;
+      lastCiphertext = ciphertext;
       onLocalChange?.();
     },
 
@@ -105,6 +114,7 @@ export function createCloudVaultStore({ userId, dataKey, onLocalChange, subscrib
         accept: () => {
           base = cache.version;
           lastWritten = canonical(data);
+          lastCiphertext = cache.ciphertext;
         },
       };
     },

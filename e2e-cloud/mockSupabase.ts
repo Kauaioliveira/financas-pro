@@ -14,6 +14,8 @@ interface MockUser {
   password: string;
   confirmed: boolean;
   displayName: string;
+  /** Everything the app sent in options.data, including the consent record. */
+  metadata: Record<string, unknown>;
 }
 
 export interface MockVault {
@@ -52,6 +54,10 @@ export class MockSupabase {
   offline = new Set<BrowserContext>();
   /** Reset e-mails "sent": link is what the user would click. */
   resetRequests: Array<{ email: string; redirectTo: string | null; challenge: string | null; code: string; link: string }> = [];
+  /** Rows of public.feedback, which the app only writes. */
+  feedback: Array<{ user_id: string; kind: string; message: string; screen: string | null; app_version: string | null }> = [];
+  /** Next insert into feedback answers with this error instead of accepting it. */
+  feedbackError: { status: number; body: unknown } | null = null;
   unexpected: string[] = [];
   private seq = 1;
 
@@ -73,7 +79,7 @@ export class MockSupabase {
       role: 'authenticated',
       email: user.email,
       email_confirmed_at: user.confirmed ? new Date().toISOString() : null,
-      user_metadata: { display_name: user.displayName },
+      user_metadata: { ...user.metadata, display_name: user.displayName },
       app_metadata: { provider: 'email' },
       identities: [{ id: user.id, provider: 'email' }],
       created_at: new Date().toISOString(),
@@ -168,6 +174,7 @@ export class MockSupabase {
       const user: MockUser = {
         id: crypto.randomUUID(), email, password: body.password, confirmed: false,
         displayName: body.data?.display_name ?? '',
+        metadata: (body.data ?? {}) as Record<string, unknown>,
       };
       this.users.set(email, user);
       return json(200, this.userJson(user));
@@ -226,6 +233,26 @@ export class MockSupabase {
         user_id: user!.id, kdf: body.kdf, pw_wrap: body.pw_wrap, kit_wrap: body.kit_wrap, keys_version: 1,
         ciphertext: body.ciphertext, version: 0, updated_at: new Date().toISOString(), device_id: body.device_id ?? null,
       });
+      return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    }
+    if (path === '/rest/v1/feedback' && method === 'POST') {
+      if (this.feedbackError) {
+        const { status, body: errorBody } = this.feedbackError;
+        this.feedbackError = null;
+        return json(status, errorBody);
+      }
+      const rows = (Array.isArray(body) ? body : [body]) as Array<Record<string, unknown>>;
+      for (const row of rows) {
+        const message = String(row.message ?? '');
+        if (!message || message.length > 2000) return json(400, { code: '23514', message: 'violates check constraint' });
+        this.feedback.push({
+          user_id: user!.id,
+          kind: String(row.kind ?? ''),
+          message,
+          screen: (row.screen as string | null) ?? null,
+          app_version: (row.app_version as string | null) ?? null,
+        });
+      }
       return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' });
     }
     if (path === '/rest/v1/vault_key_history' && method === 'GET') {

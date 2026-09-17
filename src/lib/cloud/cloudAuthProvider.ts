@@ -21,6 +21,8 @@ import type { VaultData, VaultStore } from '../vault';
 import type { AccountKdf, CloudBackend, CloudUser, KitWrap, PasswordWrap, VaultRow } from './backend';
 import { createCloudVaultStore } from './cloudVaultStore';
 import { CloudError, isCloudError } from './errors';
+import type { Feedback } from './feedback';
+import { LEGAL_VERSION } from '../legal/documents';
 import { checkCloudPassword } from './passwordPolicy';
 import { createSyncEngine } from './syncEngine';
 import type { ConflictChoice, SyncEngine } from './syncEngine';
@@ -74,6 +76,8 @@ export interface CloudSignUpInput {
   displayName: string;
   email: string;
   password: string;
+  /** The two boxes of the sign-up, ticked separately (docs §8). Both are required. */
+  consent: { terms: boolean; internationalTransfer: boolean };
 }
 
 /** A kit generated for a new vault. Nothing is sent until commit(). */
@@ -89,6 +93,7 @@ export interface CloudAuthProvider extends Omit<AuthProviderV2, 'mode'> {
   readonly mode: 'cloud';
   resolveSyncConflict(choice: ConflictChoice): Promise<void>;
   syncNow(): Promise<void>;
+  sendFeedback(feedback: Feedback): Promise<void>;
   start(): Promise<CloudStart>;
   signUp(input: CloudSignUpInput): Promise<SignInResult>;
   /** Requires a previous sign-in (or sign-up) that returned needs-vault-setup. */
@@ -255,12 +260,21 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     const keysFromCloud = { kdf: row.kdf, pwWrap: row.pwWrap, kitWrap: row.kitWrap, keysVersion: row.keysVersion };
     let next: CloudCache;
     if (!cached.dirty) {
-      next = { ...cached, ...keysFromCloud, ciphertext: row.ciphertext, version: row.version, lastSyncedAt: now().toISOString() };
+      next = {
+        ...cached,
+        ...keysFromCloud,
+        ciphertext: row.ciphertext,
+        baseCiphertext: row.ciphertext,
+        version: row.version,
+        lastSyncedAt: now().toISOString(),
+      };
     } else if (await canDecryptVault(remoteKey, cached.ciphertext)) {
       next = { ...cached, ...keysFromCloud };
     } else {
+      // The data key changed: the old base does not open with the new one, and re-encrypting
+      // it could hide a rotation. Without a base the next conflict asks the user.
       const localData = await decryptVault(cachedKey, cached.ciphertext);
-      next = { ...cached, ...keysFromCloud, ciphertext: await encryptVault(remoteKey, localData) };
+      next = { ...cached, ...keysFromCloud, ciphertext: await encryptVault(remoteKey, localData), baseCiphertext: null };
     }
     writeCloudCache(next);
     return { cache: next, dataKey: remoteKey };
@@ -309,7 +323,15 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     if (cached && localOpens && cached.dirty) {
       // The password changed on another device, but the data key is the same: keep the
       // unsent local edits; the sync compares versions before sending them.
-      const next: CloudCache = { ...base, ciphertext: cached.ciphertext, version: cached.version, dirty: true, lastSyncedAt: cached.lastSyncedAt };
+      const next: CloudCache = {
+        ...base,
+        ciphertext: cached.ciphertext,
+        // Same data key, so the base of the pending edits still opens: the merge can use it.
+        baseCiphertext: cached.baseCiphertext ?? null,
+        version: cached.version,
+        dirty: true,
+        lastSyncedAt: cached.lastSyncedAt,
+      };
       writeCloudCache(next);
       return { status: 'unlocked', session: open(next, dataKey, statusFor(next, false)) };
     }
@@ -323,6 +345,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
     const next: CloudCache = {
       ...base,
       ciphertext: row.ciphertext,
+      baseCiphertext: row.ciphertext,
       version: row.version,
       dirty: false,
       lastSyncedAt: now().toISOString(),
@@ -462,19 +485,28 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
       };
     },
 
-    async signUp({ displayName, email, password }) {
+    async signUp({ displayName, email, password, consent }) {
       const emailNorm = normalizeEmail(email);
       if (!displayName.trim()) throw new Error('Digite seu nome.');
       if (!EMAIL_PATTERN.test(emailNorm)) throw new Error('Digite um e-mail válido.');
       const rule = checkCloudPassword(password, emailNorm);
       if (rule) throw new Error(rule);
+      if (!consent?.terms || !consent.internationalTransfer) {
+        throw new Error('Para criar a conta, marque as duas caixas de consentimento.');
+      }
 
       const keys = await deriveAccountKeys(emailNorm, password);
+      const acceptedAt = now().toISOString();
       const { hasSession, user } = await backend.signUp({
         email: emailNorm,
         authSecret: keys.authSecret,
         displayName: displayName.trim(),
         redirectTo: siteUrl,
+        consent: {
+          version: LEGAL_VERSION,
+          termsAcceptedAt: acceptedAt,
+          internationalTransferAcceptedAt: acceptedAt,
+        },
       });
       if (!hasSession || !user) {
         // Same answer whether the e-mail is new or already registered (no enumeration).
@@ -584,6 +616,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
             keysVersion: 1,
             version: 0,
             ciphertext,
+            baseCiphertext: ciphertext,
             dirty: false,
             lastSyncedAt: now().toISOString(),
           };
@@ -700,6 +733,7 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
               keysVersion: latest.keysVersion + 1,
               version: version!,
               ciphertext,
+              baseCiphertext: ciphertext,
               dirty: false,
               lastSyncedAt: now().toISOString(),
             }));
@@ -839,6 +873,11 @@ export function createCloudAuthProvider({ backend, siteUrl, now = () => new Date
 
     syncNow() {
       return engine ? engine.sync() : Promise.resolve();
+    },
+
+    async sendFeedback(feedback: Feedback) {
+      requireCurrent(); // only a signed-in tester writes to the feedback table
+      await backend.sendFeedback(feedback);
     },
 
     subscribeSync(listener) {

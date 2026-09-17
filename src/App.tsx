@@ -7,7 +7,7 @@ import { ImportDraftProvider } from './context/ImportDraftContext';
 import { AuthGate } from './components/auth/AuthGate';
 import { Sidebar } from './components/Sidebar';
 import type { TabType } from './types';
-import { Settings, Trash2, X, AlertTriangle, Menu, LogOut, UserCog } from 'lucide-react';
+import { Settings, Trash2, X, AlertTriangle, CloudDownload, Menu, LogOut, MessageSquare, UserCog } from 'lucide-react';
 import { useFinance } from './context/useFinance';
 import { SettingsModal } from './components/SettingsModal';
 import { VaultLoadErrorScreen } from './components/VaultLoadErrorScreen';
@@ -40,6 +40,7 @@ const CategoryRules = lazy(async () => ({
 // Cloud builds only: with __FINANCASPRO_CLOUD__ false this is dead code, so neither the
 // cloud screens nor @supabase/supabase-js end up in the local bundle.
 const CloudRoot = __FINANCASPRO_CLOUD__ ? lazy(() => import('./components/cloud/CloudRoot')) : null;
+const FeedbackDialog = __FINANCASPRO_CLOUD__ ? lazy(() => import('./components/cloud/FeedbackDialog')) : null;
 
 function App() {
   if (CloudRoot) {
@@ -142,7 +143,14 @@ function AppShell({
     setLastConflictState(inConflict);
     if (inConflict) setConflictDismissed(false);
   }
+  // Notice of an automatic merge with another device; dismissed by message, so a new one shows again.
+  const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
+  const mergeNotice =
+    syncStatus?.state === 'synced' && syncStatus.message && syncStatus.message !== dismissedNotice
+      ? syncStatus.message
+      : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
     try {
@@ -260,6 +268,17 @@ function AppShell({
               >
                 <Menu className="h-[18px] w-[18px]" />
               </button>
+              {FeedbackDialog && (
+                <button
+                  type="button"
+                  onClick={() => setIsFeedbackOpen(true)}
+                  className="shell-icon-button hover:text-cyan-100"
+                  title="Dar opinião sobre o beta"
+                  aria-label="Dar opinião sobre o beta"
+                >
+                  <MessageSquare className="h-[18px] w-[18px]" />
+                </button>
+              )}
               <button
                 onClick={() => setIsResetOpen(true)}
                 className="shell-icon-button hover:text-rose-200"
@@ -335,6 +354,23 @@ function AppShell({
           </div>
         )}
 
+        {__FINANCASPRO_CLOUD__ && mergeNotice && (
+          <div
+            role="status"
+            className="mx-4 mt-3 flex flex-col gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100 sm:mx-6 sm:flex-row sm:items-center"
+          >
+            <CloudDownload className="hidden h-4 w-4 flex-shrink-0 text-cyan-200 sm:block" aria-hidden="true" />
+            <p className="flex-1">{mergeNotice}</p>
+            <button
+              type="button"
+              onClick={() => setDismissedNotice(mergeNotice)}
+              className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/[0.10] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+            >
+              Entendi
+            </button>
+          </div>
+        )}
+
         <div className="relative flex-1 overflow-y-auto">
           <Suspense fallback={<ContentLoader label={tabTitle} />}>{content}</Suspense>
         </div>
@@ -348,6 +384,12 @@ function AppShell({
         exportData={exportFinanceBackup}
         importData={importFinanceBackup}
       />
+
+      {FeedbackDialog && isFeedbackOpen && (
+        <Suspense fallback={null}>
+          <FeedbackDialog screen={tabTitle} onClose={() => setIsFeedbackOpen(false)} />
+        </Suspense>
+      )}
 
       {__FINANCASPRO_CLOUD__ && inConflict && !conflictDismissed && (
         <SyncConflictDialog

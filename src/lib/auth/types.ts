@@ -1,4 +1,5 @@
 import type { VaultEnvelope } from '../crypto';
+import type { Feedback } from '../cloud/feedback';
 import type { VaultStore } from '../vault';
 import type { BackupWraps } from '../../utils/backup';
 
@@ -126,6 +127,8 @@ export interface AuthProviderV2 {
   resolveSyncConflict?(choice: 'use-remote' | 'keep-local'): Promise<void>;
   /** Cloud only: check the cloud and send pending edits now. */
   syncNow?(): Promise<void>;
+  /** Cloud only: sends the tester's opinion. Never carries vault data. */
+  sendFeedback?(feedback: Feedback): Promise<void>;
   /** Accounts known on this device (cloud: cached accounts). */
   listLocalAccounts(): Promise<UserAccount[]>;
   register(input: RegisterInput): Promise<RegisterResult>;

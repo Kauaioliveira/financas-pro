@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { LogIn, UserPlus } from 'lucide-react';
 import type { SignInResult } from '../../lib/auth';
 import type { CloudAuthProvider } from '../../lib/cloud/cloudAuthProvider';
+import { LegalLinks } from '../LegalLinks';
 import { AuthPage, ErrorMessage, LinkButton, Notice, PasswordField, PrimaryButton, TextField } from './CloudUi';
 import { errorText } from './errorText';
 
@@ -85,6 +86,10 @@ export function CloudLoginScreen({
             Criar conta
           </span>
         </LinkButton>
+      </div>
+
+      <div className="mt-6 border-t border-white/10 pt-4 text-center">
+        <LegalLinks />
       </div>
     </AuthPage>
   );

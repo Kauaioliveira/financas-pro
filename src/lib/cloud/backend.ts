@@ -1,3 +1,5 @@
+import type { Feedback } from './feedback';
+
 /**
  * What the app needs from the cloud, independent of Supabase. The real adapter is
  * supabaseBackend.ts; tests use an in-memory fake with the same server rules
@@ -59,6 +61,18 @@ export interface VaultHistoryRow {
   createdAt: string;
 }
 
+/**
+ * What the person accepted at sign-up, kept with the account as a record only
+ * (never used to authorize anything). No new column: it goes in the user metadata.
+ */
+export interface ConsentRecord {
+  /** Version of the documents that were on screen. */
+  version: string;
+  termsAcceptedAt: string;
+  /** Separate acceptance, in evidence, of the international transfer (LGPD art. 33, VIII). */
+  internationalTransferAcceptedAt: string;
+}
+
 export interface CloudUser {
   id: string;
   email: string;
@@ -87,6 +101,7 @@ export interface CloudBackend {
     authSecret: string;
     displayName: string;
     redirectTo: string;
+    consent: ConsentRecord;
   }): Promise<{ hasSession: boolean; user: CloudUser | null }>;
   signIn(email: string, authSecret: string): Promise<CloudUser>;
   signOut(): Promise<void>;
@@ -114,4 +129,6 @@ export interface CloudBackend {
   fetchKeyHistory(): Promise<KeyHistoryRow[]>;
   /** Most recent first. */
   fetchVaultHistory(): Promise<VaultHistoryRow[]>;
+  /** Testers' opinion: insert only, nothing is read back. Never carries vault data. */
+  sendFeedback(feedback: Feedback): Promise<void>;
 }

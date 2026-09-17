@@ -1,12 +1,15 @@
 import type { SyncStatus } from '../auth/types';
 import type { CloudBackend, VaultRow } from './backend';
 import { CloudError, isCloudError } from './errors';
+import { mergeNotice, mergeVaults } from './mergeVault';
 import { readCloudCache, updateCloudCache } from './vaultCache';
 import type { CloudCache } from './vaultCache';
-import { canDecryptVault } from './vaultCrypto';
+import { canDecryptVault, decryptVault, encryptVault } from './vaultCrypto';
 
 export const PUSH_DEBOUNCE_MS = 3_000;
 export const PULL_STALE_MS = 60_000;
+/** Attempts of "merge and save again" before asking the user (docs §4). */
+export const MERGE_ATTEMPTS = 3;
 
 export const UNDECRYPTABLE_REMOTE_MESSAGE =
   'Os dados na nuvem mudaram de um jeito que este aparelho não consegue abrir. Seus dados locais foram preservados. Se você gerou um kit novo em outro aparelho, saia e entre de novo.';
@@ -128,7 +131,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       applied = true;
       // Only data and version come from the cloud. Key wraps stay as they are on this device:
       // a wrap this device cannot verify never replaces one that opens with its password.
-      return { ...current, ciphertext: row.ciphertext, version: row.version, lastSyncedAt: now().toISOString() };
+      return {
+        ...current,
+        ciphertext: row.ciphertext,
+        baseCiphertext: row.ciphertext,
+        version: row.version,
+        lastSyncedAt: now().toISOString(),
+      };
     });
     if (applied) options.onRemoteApplied();
   }
@@ -139,22 +148,86 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     const sent = cache.ciphertext;
     const newVersion = await backend.saveVault(cache.version, sent, deviceId);
     if (newVersion === null) {
-      const row = await backend.fetchVault();
-      if (row && !(await remoteOpens(row))) {
-        setStatus({ state: 'blocked', message: UNDECRYPTABLE_REMOTE_MESSAGE });
-      } else {
-        setStatus({ state: 'conflict', message: CONFLICT_MESSAGE });
-      }
+      const outcome = await mergeAndSave();
+      if (outcome === 'manual') setStatus({ state: 'conflict', message: CONFLICT_MESSAGE });
       return;
     }
     const updated = updateCloudCache(userId, current => ({
       ...current,
       version: newVersion,
+      // What the cloud just accepted becomes the base of the next merge.
+      baseCiphertext: sent,
       // Edits saved while sending stay pending, now based on the version just accepted.
       dirty: current.ciphertext !== sent,
       lastSyncedAt: now().toISOString(),
     }));
     if (updated.dirty) schedulePush();
+  }
+
+  /**
+   * The vault of the other device merged with this one, or null when there is no safe
+   * automatic merge: no base, a base this key no longer opens, or data the merge cannot
+   * index by id. Then the user chooses, as before.
+   */
+  async function threeWay(cache: CloudCache, row: VaultRow): Promise<{ ciphertext: string; conflicts: number } | null> {
+    if (!cache.baseCiphertext) return null;
+    try {
+      const [base, local, remote] = await Promise.all([
+        decryptVault(dataKey, cache.baseCiphertext),
+        decryptVault(dataKey, cache.ciphertext),
+        decryptVault(dataKey, row.ciphertext),
+      ]);
+      const merged = mergeVaults(base, local, remote);
+      if (!merged) return null;
+      return { ciphertext: await encryptVault(dataKey, merged.data), conflicts: merged.conflicts };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * After a rejected save: merge the two versions and save the result, at most
+   * MERGE_ATTEMPTS times. Another device saving in between, or a local edit landing
+   * during the merge, costs one attempt and the merge runs again on the newer state.
+   */
+  async function mergeAndSave(): Promise<'merged' | 'blocked' | 'manual'> {
+    let conflicts = 0;
+    for (let attempt = 1; attempt <= MERGE_ATTEMPTS; attempt += 1) {
+      const cache = requireCache();
+      if (!cache.dirty) return 'merged';
+      const row = await backend.fetchVault();
+      if (!row || !(await remoteOpens(row))) {
+        setStatus({ state: 'blocked', message: UNDECRYPTABLE_REMOTE_MESSAGE });
+        return 'blocked';
+      }
+      const merged = await threeWay(cache, row);
+      if (!merged) return 'manual';
+      conflicts += merged.conflicts;
+
+      const version = await backend.saveVault(row.version, merged.ciphertext, deviceId);
+      if (version === null) continue; // the cloud moved again: merge on top of the newer version
+
+      const updated = updateCloudCache(userId, current =>
+        current.ciphertext === cache.ciphertext
+          ? {
+              ...current,
+              ciphertext: merged.ciphertext,
+              baseCiphertext: merged.ciphertext,
+              version,
+              dirty: false,
+              lastSyncedAt: now().toISOString(),
+            }
+          : // An edit landed while merging: it stays, based on the vault it was made on top
+            // of, so the next attempt merges it with the cloud instead of overwriting it.
+            { ...current, baseCiphertext: cache.ciphertext, version, dirty: true },
+      );
+      if (updated.dirty) continue;
+
+      setStatus({ state: 'synced', message: mergeNotice(conflicts) });
+      options.onRemoteApplied();
+      return 'merged';
+    }
+    return 'manual';
   }
 
   function schedulePush(): void {
@@ -170,8 +243,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (status.state === 'blocked' || status.state === 'conflict' || status.state === 'error' || status.state === 'offline') {
       return;
     }
-    const cache = safeCache();
-    setStatus({ state: cache?.dirty ? 'pending' : 'synced' });
+    const dirty = safeCache()?.dirty ?? false;
+    // The merge notice survives the status refresh that follows it; a new edit clears it.
+    const message = !dirty && status.state === 'synced' ? status.message : null;
+    setStatus({ state: dirty ? 'pending' : 'synced', message });
   }
 
   function sync(): Promise<void> {
@@ -231,6 +306,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           updateCloudCache(userId, current => ({
             ...current,
             ciphertext: row.ciphertext,
+            baseCiphertext: row.ciphertext,
             version: row.version,
             dirty: false,
             lastSyncedAt: now().toISOString(),
@@ -249,6 +325,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         const updated = updateCloudCache(userId, current => ({
           ...current,
           version: newVersion,
+          baseCiphertext: sent,
           dirty: current.ciphertext !== sent,
           lastSyncedAt: now().toISOString(),
         }));

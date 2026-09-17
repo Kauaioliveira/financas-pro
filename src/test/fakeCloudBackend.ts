@@ -1,5 +1,7 @@
 import { CloudError } from '../lib/cloud/errors';
+import type { Feedback } from '../lib/cloud/feedback';
 import type {
+  ConsentRecord,
   CloudAuthEvent,
   CloudBackend,
   CloudUser,
@@ -17,6 +19,8 @@ interface FakeUser {
   authSecret: string;
   displayName: string;
   confirmed: boolean;
+  /** What user_metadata would hold: the record of the accepted documents. */
+  consent: ConsentRecord | null;
 }
 
 /**
@@ -34,7 +38,10 @@ export class FakeCloudServer {
   autoConfirm = false;
   allowlist: Set<string> | null = null;
   resetRequests: string[] = [];
+  feedback: Array<Feedback & { userId: string }> = [];
   calls: string[] = [];
+  /** Runs before every saveVault: lets a test simulate another device saving right then. */
+  onBeforeSave: (() => void) | null = null;
   private clock = Date.parse('2026-09-14T12:00:00.000Z');
 
   tick(ms = 1_000): string {
@@ -71,13 +78,14 @@ export class FakeCloudServer {
     return new FakeDevice(this);
   }
 
-  createUser(email: string, authSecret: string, displayName: string): FakeUser {
+  createUser(email: string, authSecret: string, displayName: string, consent: ConsentRecord | null = null): FakeUser {
     const user: FakeUser = {
       id: `00000000-0000-4000-8000-${String(nextUserId++).padStart(12, '0')}`,
       email,
       authSecret,
       displayName,
       confirmed: this.autoConfirm,
+      consent,
     };
     this.users.set(email, user);
     return user;
@@ -129,14 +137,24 @@ export class FakeDevice implements CloudBackend {
     return user ? this.toUser(user) : null;
   }
 
-  async signUp({ email, authSecret, displayName }: { email: string; authSecret: string; displayName: string }) {
+  async signUp({
+    email,
+    authSecret,
+    displayName,
+    consent,
+  }: {
+    email: string;
+    authSecret: string;
+    displayName: string;
+    consent: ConsentRecord;
+  }) {
     this.net('signUp');
     if (this.server.allowlist && !this.server.allowlist.has(email)) {
       throw new CloudError('signup-blocked', 'Cadastro fechado: este e-mail ainda não está na lista do beta.');
     }
     const existing = this.server.users.get(email);
     if (existing) return { hasSession: false, user: null };
-    const user = this.server.createUser(email, authSecret, displayName);
+    const user = this.server.createUser(email, authSecret, displayName, consent);
     if (!user.confirmed) return { hasSession: false, user: this.toUser(user) };
     this.sessionEmail = email;
     return { hasSession: true, user: this.toUser(user) };
@@ -204,6 +222,7 @@ export class FakeDevice implements CloudBackend {
   async saveVault(expectedVersion: number, ciphertext: string) {
     this.net('saveVault');
     if (!ciphertext) throw new CloudError('server');
+    this.server.onBeforeSave?.();
     const row = this.server.vaults.get(this.me().id);
     if (!row || row.version !== expectedVersion) return null;
     return this.server.updateVault(row.userId, r => ({ ...r, ciphertext, version: r.version + 1, updatedAt: this.server.tick() })).version;
@@ -236,6 +255,13 @@ export class FakeDevice implements CloudBackend {
       keysVersion: r.keysVersion + 1,
       updatedAt: this.server.tick(),
     })).version;
+  }
+
+  async sendFeedback(feedback: Feedback) {
+    this.net('sendFeedback');
+    const user = this.me();
+    if (feedback.message.length < 1 || feedback.message.length > 2_000) throw new CloudError('server');
+    this.server.feedback.push({ ...feedback, userId: user.id });
   }
 
   async fetchKeyHistory() {

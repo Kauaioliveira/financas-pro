@@ -19,3 +19,6 @@ interface ImportMeta {
 
 /** Set by vite.config.ts: true only when the build has cloud variables. */
 declare const __FINANCASPRO_CLOUD__: boolean;
+
+/** Set by vite.config.ts: version of package.json plus the build date. */
+declare const __FINANCASPRO_VERSION__: string;

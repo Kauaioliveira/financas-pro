@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -6,6 +7,16 @@ import { connectSrcFor, readCloudConfig } from './src/lib/cloud/env'
 import type { CloudConfig } from './src/lib/cloud/env'
 
 const CONNECT_SRC_PLACEHOLDER = '__CSP_CONNECT_SRC__'
+
+/**
+ * Which build this is, sent with the testers' opinions ("app_version", at most 40 chars).
+ * The version of package.json alone does not change between deploys, so the build date
+ * goes with it. No personal data and nothing about the machine that built it.
+ */
+function appVersion(): string {
+  const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version?: string }
+  return `${pkg.version || '0.0.0'}+${new Date().toISOString().slice(0, 10)}`.slice(0, 40)
+}
 
 /**
  * Fills connect-src of the CSP <meta> in index.html (dev and build): 'self' in local
@@ -30,7 +41,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     // false turns every cloud branch into dead code, so the local bundle has no cloud modules.
-    define: { __FINANCASPRO_CLOUD__: JSON.stringify(cloud !== null) },
+    define: {
+      __FINANCASPRO_CLOUD__: JSON.stringify(cloud !== null),
+      __FINANCASPRO_VERSION__: JSON.stringify(appVersion()),
+    },
     plugins: [react(), tailwindcss(), cspConnectSrc(cloud)],
     build: {
       rollupOptions: {

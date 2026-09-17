@@ -62,6 +62,7 @@ export function toCloudDataError(error: ErrorLike): CloudError {
   if (isNetwork(error)) return new CloudError('network');
   const code = error.code ?? '';
   if (code === '23505') return new CloudError('conflict');
+  if (error.status === 429 || code.startsWith('over_')) return new CloudError('rate-limited');
   // 54000: teto de trocas de chave do gatilho snapshot_vault_keys. Nada foi alterado.
   if (code === '54000') return new CloudError('too-many-key-changes');
   if (code === '28000' || code === '42501' || code === 'PGRST301' || code === 'PGRST303') {
@@ -109,11 +110,20 @@ export function createSupabaseBackend(client: SupabaseClient): CloudBackend {
       return toCloudUser(data.session.user);
     },
 
-    async signUp({ email, authSecret, displayName, redirectTo }) {
+    async signUp({ email, authSecret, displayName, redirectTo, consent }) {
       const { data, error } = await client.auth.signUp({
         email,
         password: authSecret,
-        options: { emailRedirectTo: redirectTo, data: { display_name: displayName } },
+        options: {
+          emailRedirectTo: redirectTo,
+          // user_metadata: a record of the acceptance, never read to authorize anything.
+          data: {
+            display_name: displayName,
+            consent_version: consent.version,
+            consent_terms_at: consent.termsAcceptedAt,
+            consent_intl_transfer_at: consent.internationalTransferAcceptedAt,
+          },
+        },
       });
       if (error) throw toCloudAuthError(error, 'sign-up');
       return { hasSession: data.session !== null, user: data.user ? toCloudUser(data.user) : null };
@@ -246,6 +256,17 @@ export function createSupabaseBackend(client: SupabaseClient): CloudBackend {
         keysVersion: row.keys_version,
         createdAt: row.created_at,
       }));
+    },
+
+    async sendFeedback(feedback) {
+      await run(
+        client.from('feedback').insert({
+          kind: feedback.kind,
+          message: feedback.message,
+          screen: feedback.screen,
+          app_version: feedback.appVersion,
+        }),
+      );
     },
 
     async fetchVaultHistory(): Promise<VaultHistoryRow[]> {

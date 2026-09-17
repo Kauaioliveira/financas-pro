@@ -28,7 +28,7 @@ async function confirmKit(page: Page, words: string[]) {
 }
 
 async function signIn(page: Page, email: string, password: string) {
-  await page.getByLabel('E-mail').fill(email);
+  await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill(password);
   await page.getByRole('button', { name: /^entrar$/i }).click();
 }
@@ -37,9 +37,11 @@ async function signIn(page: Page, email: string, password: string) {
 async function createAccount(page: Page, server: MockSupabase, start: (page: Page) => Promise<void>): Promise<string[]> {
   await page.getByRole('button', { name: /criar conta/i }).click();
   await page.getByLabel('Seu nome').fill('Dono');
-  await page.getByLabel('E-mail').fill(EMAIL);
+  await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Confirmar senha').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /li e aceito os termos do beta/i }).check();
+  await page.getByRole('checkbox', { name: /transferência internacional/i }).check();
   await page.getByRole('button', { name: /^criar conta$/i }).click();
 
   await expect(page.getByRole('heading', { name: /confirme seu e-mail/i })).toBeVisible();
@@ -61,9 +63,11 @@ test.describe('Nuvem: conta, cofre e segundo aparelho', () => {
     const { page } = await newDevice(browser, server);
     await page.getByRole('button', { name: /criar conta/i }).click();
     await page.getByLabel('Seu nome').fill('Dono');
-    await page.getByLabel('E-mail').fill(EMAIL);
+    await page.getByLabel('E-mail', { exact: true }).fill(EMAIL);
     await page.getByLabel('Senha', { exact: true }).fill('senha1234567');
     await page.getByLabel('Confirmar senha').fill('senha1234567');
+    await page.getByRole('checkbox', { name: /li e aceito os termos do beta/i }).check();
+    await page.getByRole('checkbox', { name: /transferência internacional/i }).check();
     await page.getByRole('button', { name: /^criar conta$/i }).click();
     await expect(page.getByRole('alert')).toContainText(/muito comum/i);
     expect(server.users.size).toBe(0);
