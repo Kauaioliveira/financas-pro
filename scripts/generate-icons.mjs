@@ -228,13 +228,16 @@ function maskable(image, size) {
 }
 
 const source = decodePng(await readFile(SOURCE));
+// O PNG de origem não tem canal alfa, então sem isto o logo sai com um quadrado preto
+// em volta nos lançadores de fundo claro. Com a cor da placa, o ícone fica inteiriço.
+const plated = fillCornersWithPlate(source);
 await mkdir(OUT_DIR, { recursive: true });
 
 const outputs = [
-  ['icon-192.png', resize(source, 192)],
-  ['icon-512.png', resize(source, 512)],
+  ['icon-192.png', resize(plated, 192)],
+  ['icon-512.png', resize(plated, 512)],
   ['icon-maskable-512.png', maskable(source, 512)],
-  ['apple-touch-icon-180.png', resize(source, 180)],
+  ['apple-touch-icon-180.png', resize(plated, 180)],
 ];
 
 for (const [name, image] of outputs) {
