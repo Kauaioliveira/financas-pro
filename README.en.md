@@ -121,6 +121,27 @@ Deploying: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) (database, auth,
 - **Esqueci a senha** (forgot password) by email, and **Abrir dados com o kit** to get the data back after a reset.
 - **Closed beta**: only emails listed in the `beta_allowlist` table can sign up.
 
+## Installing on a phone or a computer
+
+FinancasPro is a PWA: you can install it as an app, with its own icon and name, open it in its own window and use it without internet.
+
+- **Android (Chrome)**: open the site, tap the menu (⋮) and choose **Install app**. Chrome usually offers it on its own as well.
+- **Desktop (Chrome or Edge)**: click the install icon in the address bar, or menu → **Install FinancasPro**.
+- **iPhone and iPad**: iOS shows no install prompt. Open the site **in Safari**, tap **Share** and choose **Add to Home Screen**. Chrome on iPhone cannot install it.
+
+### What changes offline
+
+| Mode | Offline |
+|---|---|
+| Local | Everything works. The data never left the device anyway. |
+| Cloud | The app opens from the cache and shows the **Sem sincronizar** (not synced) badge. You keep editing and the changes go up when the connection is back. Signing in for the first time on a new device still needs internet. |
+
+Only the app's own files are stored on the device (HTML, JavaScript, CSS, icons and the manifest). **No Supabase response is ever cached** — not the encrypted vault, not the sign-in: those calls always go straight to the network. The rule lives in [`src/pwa/sw-template.js`](src/pwa/sw-template.js) and is locked down by tests in `src/pwa/serviceWorker.test.ts` and `e2e-cloud/pwa.spec.ts`.
+
+The PDF reader (~2 MB) stays out of the install so it does not eat a data plan at once; it is cached the first time you import a PDF while online.
+
+When a new version ships the app does **not** swap itself: a notice reading **"Nova versão do FinançasPro disponível"** appears with an **Atualizar agora** button, so an open form or an import in progress is not lost. Dismissing it only hides it until the next load.
+
 ## Account recovery
 
 > **Email gives back access to the account. Only the recovery kit opens the data.**
@@ -238,6 +259,7 @@ Main entry points:
 | `src/lib/vault/` | `VaultStore` (local and cloud) and the queued saver |
 | `src/utils/secureStorage.ts` | Encrypted vault in `localStorage`, with typed errors |
 | `src/context/FinanceContext.tsx` | Central state and financial aggregations |
+| `src/pwa/sw-template.js` | Service worker: precaches the static build, never user data |
 | `src/utils/backup.ts` | Backup v2 (kit or password) and readers for the older formats |
 | `supabase/migrations/0001_init.sql` | Database tables, policies, and functions |
 

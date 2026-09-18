@@ -1,12 +1,19 @@
-import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import type { Dirent } from 'node:fs'
+import { posix, resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { connectSrcFor, readCloudConfig } from './src/lib/cloud/env'
 import type { CloudConfig } from './src/lib/cloud/env'
+import { precachePaths } from './src/pwa/precache'
+import type { BuildFile } from './src/pwa/precache'
 
 const CONNECT_SRC_PLACEHOLDER = '__CSP_CONNECT_SRC__'
+const SW_CONFIG_PLACEHOLDER = '__SW_CONFIG__'
+const SW_TEMPLATE = './src/pwa/sw-template.js'
 
 /**
  * Which build this is, sent with the testers' opinions ("app_version", at most 40 chars).
@@ -35,6 +42,68 @@ function cspConnectSrc(cloud: CloudConfig | null): Plugin {
   }
 }
 
+/** Arquivos de public/ (favicon, ícones, manifesto), que o Vite copia sem passar pelo bundle. */
+function publicFiles(dir: string, prefix = ''): BuildFile[] {
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  return entries.flatMap(entry => {
+    const path = posix.join(prefix, entry.name)
+    return entry.isDirectory()
+      ? publicFiles(resolve(dir, entry.name), path)
+      : [{ path, size: statSync(resolve(dir, entry.name)).size }]
+  })
+}
+
+/**
+ * Emite dist/sw.js a partir de src/pwa/sw-template.js com a lista de estáticos deste build.
+ * Só arquivos do build entram: o modelo é que garante que dado de usuário nunca vá para o
+ * cache, e src/pwa/serviceWorker.test.ts trava essa regra.
+ */
+function serviceWorker(): Plugin {
+  let publicDir = ''
+  let assetsDir = 'assets'
+  return {
+    name: 'financaspro-service-worker',
+    apply: 'build',
+    configResolved(config) {
+      publicDir = config.publicDir
+      assetsDir = config.build.assetsDir
+    },
+    generateBundle(_options, bundle) {
+      const built: BuildFile[] = Object.values(bundle).map(item =>
+        item.type === 'chunk'
+          ? { path: item.fileName, size: Buffer.byteLength(item.code) }
+          : { path: item.fileName, size: Buffer.byteLength(item.source as string | Uint8Array) },
+      )
+      // O index.html ainda não está no bundle neste gancho; ele é a casca e entra sempre.
+      // Não entra no cálculo da versão, e tudo bem: a navegação busca a casca na rede
+      // primeiro e só cai no cache quando não há rede, então ela nunca fica velha.
+      const precache = precachePaths([...built, ...publicFiles(publicDir), { path: 'index.html', size: 0 }])
+
+      // A versão é o resumo da própria lista: se nada mudou, o cache do usuário continua
+      // valendo; se um arquivo mudou, o sw.js muda e o navegador oferece a atualização.
+      const version = createHash('sha256').update(precache.join('\n')).digest('hex').slice(0, 12)
+      const config = { version, assetPrefix: `/${assetsDir}/`, precache }
+
+      const template = readFileSync(new URL(SW_TEMPLATE, import.meta.url), 'utf8')
+      // Exatamente uma: se a marca aparecer também num comentário, a configuração cai lá.
+      const marks = template.split(SW_CONFIG_PLACEHOLDER).length - 1
+      if (marks !== 1) {
+        throw new Error(`${SW_TEMPLATE} precisa da marca de configuração uma única vez (encontradas: ${marks}).`)
+      }
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sw.js',
+        source: template.replace(SW_CONFIG_PLACEHOLDER, JSON.stringify(config, null, 2)),
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   // Throws on unsafe values (e.g. a secret key), so a broken deploy fails at build time.
   const cloud = readCloudConfig(loadEnv(mode, process.cwd(), 'VITE_'))
@@ -45,7 +114,12 @@ export default defineConfig(({ mode }) => {
       __FINANCASPRO_CLOUD__: JSON.stringify(cloud !== null),
       __FINANCASPRO_VERSION__: JSON.stringify(appVersion()),
     },
-    plugins: [react(), tailwindcss(), cspConnectSrc(cloud)],
+    plugins: [
+      react(),
+      tailwindcss(),
+      cspConnectSrc(cloud),
+      serviceWorker(),
+    ],
     build: {
       rollupOptions: {
         output: {
