@@ -6,6 +6,7 @@ Mudanças relevantes para quem usa o FinançasPro. O formato segue o [Keep a Cha
 
 ### Adicionado
 
+- **Instalar como aplicativo (PWA)**: ícone na tela inicial do celular e do computador, janela própria e abertura **sem internet**. No modo local o app funciona inteiro offline; no modo nuvem ele abre pelo cache e mostra **Sem sincronizar**. Só os arquivos do app ficam guardados: nenhuma resposta do servidor, nem o cofre cifrado, entra em cache. Versão nova nunca é aplicada sozinha — aparece o aviso **Nova versão do FinançasPro disponível** com o botão **Atualizar agora**.
 - **Kit de recuperação renovável.** Em **Configurações → Kit de recuperação → Gerar kit novo**, o app pede a senha da conta, mostra uma folha imprimível com id curto e data, pede **3 palavras sorteadas** e só então gira a chave dos dados e grava. O kit anterior deixa de abrir a conta.
 - **Folha imprimível do kit**, com id, data, as 12 palavras numeradas e instruções de uso, no cadastro e a cada kit novo.
 - **Modo nuvem opcional** (Supabase + Cloudflare), ligado por `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`: conta por e-mail com confirmação, cofre cifrado na nuvem, sincronização entre aparelhos, **Esqueci a senha** e **Abrir dados com o kit**. Sem essas variáveis, o app continua 100% local e o código de nuvem nem entra no arquivo publicado.

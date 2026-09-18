@@ -119,6 +119,27 @@ Publicar: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) (banco, autentica
 - **Esqueci a senha** por e-mail e **Abrir dados com o kit** para devolver os dados depois da redefinição.
 - **Beta fechado**: só e-mails cadastrados na tabela `beta_allowlist` conseguem criar conta.
 
+## Instalar no celular e no computador
+
+O FinançasPro é um PWA: dá para instalar como aplicativo, com ícone e nome próprios, abrir em janela separada do navegador e usar sem internet.
+
+- **Android (Chrome)**: abra o site, toque no menu (⋮) e escolha **Instalar app**. O Chrome também costuma oferecer a instalação sozinho.
+- **Computador (Chrome ou Edge)**: clique no ícone de instalar na barra de endereço, ou menu → **Instalar FinançasPro**.
+- **iPhone e iPad**: o iOS não mostra convite de instalação. Abra o site **no Safari**, toque em **Compartilhar** e escolha **Adicionar à Tela de Início**. O Chrome do iPhone não instala o app.
+
+### O que muda sem internet
+
+| Modo | Sem internet |
+|---|---|
+| Local | Funciona inteiro. Os dados nunca saíram do aparelho. |
+| Nuvem | O app abre pelo cache e mostra o selo **Sem sincronizar**. Você continua editando e as alterações sobem quando a conexão volta. Entrar pela primeira vez num aparelho novo continua precisando de internet. |
+
+Só os arquivos do app ficam guardados no aparelho (HTML, JavaScript, CSS, ícones e o manifesto). **Nenhuma resposta do Supabase entra em cache** — nem o cofre cifrado, nem o login: essas chamadas vão sempre direto para a rede. A regra está em [`src/pwa/sw-template.js`](src/pwa/sw-template.js) e é travada por testes em `src/pwa/serviceWorker.test.ts` e `e2e-cloud/pwa.spec.ts`.
+
+O leitor de PDF (~2 MB) fica de fora da instalação para não gastar o plano de dados de uma vez; ele entra no cache na primeira importação de PDF feita com internet.
+
+Quando sai uma versão nova, o app **não** troca sozinho: aparece o aviso **"Nova versão do FinançasPro disponível"** com o botão **Atualizar agora**. Assim uma importação ou um formulário aberto não some no meio do caminho. Quem dispensa o aviso volta a vê-lo no próximo carregamento.
+
 ## Recuperação de conta
 
 > **O e-mail devolve o acesso à conta. Só o kit de recuperação abre os dados.**
@@ -238,6 +259,7 @@ Pontos de entrada principais:
 | `src/lib/vault/` | `VaultStore` (local e nuvem) e o gravador com fila |
 | `src/utils/secureStorage.ts` | Cofre cifrado no `localStorage`, com erros tipados |
 | `src/context/FinanceContext.tsx` | Estado central e agregações financeiras |
+| `src/pwa/sw-template.js` | Service worker: precache dos estáticos e nada de dado do usuário |
 | `src/utils/backup.ts` | Backup v2 (kit ou senha) e leitura dos formatos antigos |
 | `supabase/migrations/0001_init.sql` | Tabelas, políticas e funções do banco |
 
