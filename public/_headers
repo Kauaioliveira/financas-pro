@@ -6,3 +6,8 @@
   Content-Security-Policy: frame-ancestors 'none'
   Strict-Transport-Security: max-age=31536000
   Cross-Origin-Opener-Policy: same-origin
+
+# O navegador precisa reparar numa versão nova do worker; um sw.js em cache prenderia
+# a pessoa na versão antiga do app.
+/sw.js
+  Cache-Control: no-cache

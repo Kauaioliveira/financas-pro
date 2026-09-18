@@ -7,6 +7,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     headless: true,
+    // The build ships a service worker; letting it cache between tests would hide
+    // regressions behind stale files. e2e/pwa.spec.ts turns it back on for itself.
+    serviceWorkers: 'block',
   },
   webServer: {
     command: 'npm run preview',

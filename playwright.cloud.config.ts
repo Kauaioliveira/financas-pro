@@ -14,6 +14,8 @@ export default defineConfig({
     baseURL: 'http://localhost:4174',
     headless: true,
     channel: process.env.PW_CHANNEL || undefined,
+    // Same reason as the local config: the worker must not serve cached files to the tests.
+    serviceWorkers: 'block',
   },
   webServer: {
     command: 'npx vite build --outDir dist-cloud-test --emptyOutDir && npx vite preview --outDir dist-cloud-test --port 4174 --strictPort',
