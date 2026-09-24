@@ -18,7 +18,11 @@ The app interface is in Brazilian Portuguese; UI labels below are quoted as they
 |---|---|
 | ![Statement import with automatic categorization](docs/screenshots/import.png) | ![Credit card module](docs/screenshots/credit-card.png) |
 
-The screenshots are from July 2026 and don't show invoice import, the recovery kit, or the current UI density yet.
+| Recovery kit |
+|---|
+| ![Recovery kit with the 12 words and the kit id](docs/screenshots/recovery-kit.png) |
+
+The images come from the real app, with made-up sample data: `npm run screenshots` registers a demo account, imports the sample statement and the sample invoice, and regenerates all five captures. The script and the sample files live in [`e2e-screenshots/`](e2e-screenshots).
 
 ## Why it's different
 
@@ -78,6 +82,7 @@ The entry screen now asks for an **email**. If it still asks for a name and a pa
 | `npm run test:e2e` | Playwright in local mode |
 | `npm run test:e2e:cloud` | Playwright in cloud mode against a simulated Supabase (`e2e-cloud/mockSupabase.ts`); not part of CI |
 | `npm run check:bundle` | Checks the `dist` folder; with `-- --expect-local`, also requires that no cloud code is present |
+| `npm run screenshots` | Regenerates the `docs/screenshots` images with sample data (`e2e-screenshots/`); not part of CI |
 
 CI (GitHub Actions) runs lint, unit tests, build, `check:bundle -- --expect-local`, and the local-mode Playwright suite.
 

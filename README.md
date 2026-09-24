@@ -16,7 +16,11 @@ O app roda **100% no navegador por padrão**: sem conta, sem servidor, sem telem
 |---|---|
 | ![Importar extrato com categorização automática](docs/screenshots/import.png) | ![Módulo de cartão de crédito](docs/screenshots/credit-card.png) |
 
-As capturas são de julho de 2026 e ainda não mostram a importação de fatura, o kit de recuperação nem a densidade atual da interface.
+| Kit de recuperação |
+|---|
+| ![Kit de recuperação com as 12 palavras e o id do kit](docs/screenshots/recovery-kit.png) |
+
+As imagens saem do app de verdade, com dados de exemplo inventados: `npm run screenshots` cadastra uma conta de demonstração, importa o extrato e a fatura de exemplo e refaz as cinco capturas. O roteiro e os arquivos de exemplo estão em [`e2e-screenshots/`](e2e-screenshots).
 
 ## Por que é diferente
 
@@ -76,6 +80,7 @@ A tela de entrada passa a pedir **e-mail**. Se ela continuar pedindo nome e senh
 | `npm run test:e2e` | Playwright no modo local |
 | `npm run test:e2e:cloud` | Playwright no modo nuvem contra um Supabase simulado (`e2e-cloud/mockSupabase.ts`); não roda na CI |
 | `npm run check:bundle` | Confere a pasta `dist`; com `-- --expect-local`, também exige que não haja código de nuvem |
+| `npm run screenshots` | Regera as capturas de `docs/screenshots` com dados de exemplo (`e2e-screenshots/`); não roda na CI |
 
 A CI (GitHub Actions) roda lint, testes unitários, build, `check:bundle -- --expect-local` e o Playwright do modo local.
 
