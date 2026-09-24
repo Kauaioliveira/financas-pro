@@ -39,7 +39,7 @@ The screenshots are from July 2026 and don't show invoice import, the recovery k
 | Parsing | PapaParse, pdfjs-dist |
 | Encryption | Web Crypto API (PBKDF2-SHA256, AES-256-GCM, HKDF) |
 | Validation | Zod |
-| Cloud (optional) | Supabase (Auth + Postgres), Cloudflare Workers static assets |
+| Cloud (optional) | Supabase (Auth + Postgres), Cloudflare Pages static assets |
 
 ## Running locally
 
@@ -271,7 +271,7 @@ Authentication, E2E encryption, encrypted backup, legacy data migration, auto-lo
 
 ### Phase 2 — Email accounts (done, closed beta)
 
-Cloud provider on top of Supabase (email login, confirmation, password reset), versioned encrypted vault in the `vaults` table, owner-only-read RLS with writes restricted to functions, vault and key history, cross-device sync with user-chosen conflict resolution, "Abrir dados com o kit", and deployment on Cloudflare Workers.
+Cloud provider on top of Supabase (email login, confirmation, password reset), versioned encrypted vault in the `vaults` table, owner-only-read RLS with writes restricted to functions, vault and key history, cross-device sync with user-chosen conflict resolution, "Abrir dados com o kit", and deployment on Cloudflare Pages.
 
 Access is **closed by an email allowlist** (`beta_allowlist` plus the *Before User Created* hook): an address that is not on the list cannot sign up.
 

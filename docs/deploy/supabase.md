@@ -124,7 +124,7 @@ O Gmail aceita até 500 mensagens por dia. É suficiente para o beta.
 
 Em **Authentication → URL Configuration**:
 
-- **Site URL**: a URL publicada na Cloudflare (ex.: `https://financaspro.<sua-conta>.workers.dev`;
+- **Site URL**: a URL publicada na Cloudflare (ex.: `https://financas-pro-8hq.pages.dev`;
   como publicar: `docs/deploy/cloudflare.md`).
   Enquanto ela não existir, use `http://localhost:5173`.
 - **Redirect URLs**: a URL publicada, `http://localhost:5173` e `http://localhost:4173`.

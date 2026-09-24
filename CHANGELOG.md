@@ -20,6 +20,7 @@ Mudanças relevantes para quem usa o FinançasPro. O formato segue o [Keep a Cha
 - **Aviso fixo quando uma gravação falha** (armazenamento cheio, por exemplo), com a opção de tentar de novo. Os dados pendentes continuam na fila em vez de serem descartados.
 - **Banco de dados versionado**: `supabase/migrations/0001_init.sql` (tabelas, políticas e funções) e `supabase/tests/0001_init_check.sql` para conferir o esquema num projeto de teste.
 - **Guias de publicação**: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) e [`docs/deploy/cloudflare.md`](docs/deploy/cloudflare.md).
+- **Site publicado no Cloudflare Pages** a partir da `main` (build `npm run build`, saída `dist`); o `wrangler.jsonc` ficou só como caminho alternativo para quem quiser migrar para Workers.
 - **Guia de recuperação de conta para quem usa o app**: [`docs/RECUPERACAO-DE-CONTA.md`](docs/RECUPERACAO-DE-CONTA.md).
 - **Guarda de bundle** (`npm run check:bundle`): o build falha se uma chave secreta do Supabase (`sb_secret_...` ou `service_role`) aparecer no site, e a CI ainda exige que o build local não contenha código de nuvem.
 - Cabeçalhos de segurança (`public/_headers`), CSP montada no build com a origem do Supabase, `wrangler.jsonc` e `.env.example`.

@@ -37,7 +37,7 @@ As capturas são de julho de 2026 e ainda não mostram a importação de fatura,
 | Parsing | PapaParse, pdfjs-dist |
 | Criptografia | Web Crypto API (PBKDF2-SHA256, AES-256-GCM, HKDF) |
 | Validação | Zod |
-| Nuvem (opcional) | Supabase (Auth + Postgres), Cloudflare Workers com arquivos estáticos |
+| Nuvem (opcional) | Supabase (Auth + Postgres), Cloudflare Pages com arquivos estáticos |
 
 ## Rodando localmente
 
@@ -271,7 +271,7 @@ Autenticação, criptografia E2E, backup cifrado, migração de dados legados, a
 
 ### Fase 2 — Conta com e-mail (concluída, em beta fechado)
 
-Provedor de nuvem sobre o Supabase (login por e-mail, confirmação, redefinição de senha), cofre cifrado com versão na tabela `vaults`, RLS de "só o dono lê" com escrita apenas por funções, histórico de cofre e de chaves, sincronização entre aparelhos com resolução de conflito pelo usuário, "Abrir dados com o kit" e publicação em Cloudflare Workers.
+Provedor de nuvem sobre o Supabase (login por e-mail, confirmação, redefinição de senha), cofre cifrado com versão na tabela `vaults`, RLS de "só o dono lê" com escrita apenas por funções, histórico de cofre e de chaves, sincronização entre aparelhos com resolução de conflito pelo usuário, "Abrir dados com o kit" e publicação no Cloudflare Pages.
 
 O acesso é **fechado por lista de e-mails** (`beta_allowlist` + hook *Before User Created*): quem não está na lista não consegue se cadastrar.
 
