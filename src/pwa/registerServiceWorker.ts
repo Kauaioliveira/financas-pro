@@ -24,15 +24,20 @@ export function registerServiceWorker(onUpdateReady: (applyUpdate: () => void) =
 
   let disposed = false;
   let reloading = false;
+  // Só a troca pedida pelo aviso de versão nova recarrega a página. Na primeira
+  // instalação o worker faz clients.claim(), que também dispara controllerchange:
+  // recarregar ali apagaria o que a pessoa estivesse digitando logo ao abrir o app.
+  let updateRequested = false;
   let lastCheck = Date.now();
 
   const applyUpdateWith = (worker: ServiceWorker) => () => {
     // A troca de controlador só acontece depois que o worker novo faz skipWaiting().
+    updateRequested = true;
     worker.postMessage({ type: 'SKIP_WAITING' });
   };
 
   const onControllerChange = () => {
-    if (reloading) return;
+    if (reloading || !updateRequested) return;
     reloading = true;
     window.location.reload();
   };
