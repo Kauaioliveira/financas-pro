@@ -24,11 +24,11 @@ The app interface is in Brazilian Portuguese; UI labels below are quoted as they
 |---|---|
 | ![Donut of this month's spending by category and stacked bars for recent months](docs/screenshots/charts.png) | ![Projection for the next 3 months with a likely range](docs/screenshots/projection.png) |
 
-| Recovery kit |
-|---|
-| ![Recovery kit with the 12 words and the kit id](docs/screenshots/recovery-kit.png) |
+| Budget by category | Recovery kit |
+|---|---|
+| ![Budget tab with each category's limit and how much of it was used](docs/screenshots/budget.png) | ![Recovery kit with the 12 words and the kit id](docs/screenshots/recovery-kit.png) |
 
-The images come from the real app, with made-up sample data: `npm run screenshots` registers a demo account, imports the sample statement and the sample invoice, and regenerates all seven captures. The script and the sample files live in [`e2e-screenshots/`](e2e-screenshots).
+The images come from the real app, with made-up sample data: `npm run screenshots` registers a demo account, imports the sample statement and the sample invoice, and regenerates all eight captures. The script and the sample files live in [`e2e-screenshots/`](e2e-screenshots).
 
 ## Why it's different
 
@@ -118,6 +118,7 @@ Deploying: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) (database, auth,
 - Monthly dashboard: income, account outflows, invoices in their due month, and open card purchases.
 - **Spending charts**: a donut with this month's categories (account + invoices) and stacked bars with the top 5 categories of the last 6 months, each category always in the same color.
 - **Spending projection** for the current month and the next 2: weighted average of the last closed months (recent months weigh more), a capped trend, and a likely range. It never goes below the invoices you already owe, so an installment purchase shows up in the month it will hit. Full rule in [`src/utils/projection.ts`](src/utils/projection.ts).
+- **Budget by category** (**Orçamento** tab): a monthly limit per category, each one suggested from the average of the last closed months (**Usar as sugestões** button). Each category shows how much of its limit the month used, flagged **Atenção** from 80% and **Estourou** from 100%, and the dashboard shows the month's summary. Limits live in the encrypted vault, go into backups, and sync across devices.
 - Spend breakdown by category, type, and merchant (with filters).
 - Automatic categorization rules (match on part of the description).
 - Local authentication with rate limiting (5 attempts, 5-minute lockout).
@@ -296,4 +297,4 @@ Access is **closed by an email allowlist** (`beta_allowlist` plus the *Before Us
 
 ### Phase 4 — Complete personal finance
 
-Spending charts and projection (done). Next, in order: per-category budgets with automatic suggestions, fixed bills and subscriptions, expected month-end balance, goals with deadlines, and a net-worth view. Detailed plan (in Portuguese): [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).
+Spending charts and projection (done) and per-category budgets with automatic suggestions (done). Next, in order: fixed bills and subscriptions, expected month-end balance, goals with deadlines, and a net-worth view. Detailed plan (in Portuguese): [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).

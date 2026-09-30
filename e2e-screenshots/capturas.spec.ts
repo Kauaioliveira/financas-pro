@@ -103,7 +103,7 @@ async function capturar(page: Page, arquivo: string) {
 }
 
 test.describe('Capturas do README', () => {
-  test('gera as sete imagens com a conta de demonstração', async ({ page }) => {
+  test('gera as oito imagens com a conta de demonstração', async ({ page }) => {
     await page.clock.setFixedTime(HOJE);
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
@@ -177,6 +177,12 @@ test.describe('Capturas do README', () => {
 
     await trazerParaOTopo(page.locator('section[aria-labelledby="projecao-titulo"]'));
     await capturar(page, 'projection.png');
+
+    // --- Orçamento: aplica as sugestões calculadas pelos meses fechados ---
+    await irParaAba(page, /orçamento/i);
+    await page.getByRole('button', { name: /usar as \d+ sugestões/i }).click();
+    await expect(page.getByRole('article', { name: /teto de/i }).first()).toBeVisible();
+    await capturar(page, 'budget.png');
 
     // --- Login (a conta já existe, então a tela mostra o estado real) ---
     await page.getByTitle('Sair').click();
