@@ -25,7 +25,7 @@ function formatDate(iso: string | null): string {
 }
 
 function summarize(data: BackupData): string {
-  return `${data.transactions.length} transações, ${data.cards.length} cartões, ${data.cardPurchases.length} compras, ${data.rules.length} regras.`;
+  return `${data.transactions.length} transações, ${data.cards.length} cartões, ${data.cardPurchases.length} compras, ${data.rules.length} regras${data.budgets?.length ? `, ${data.budgets.length} tetos de orçamento` : ''}.`;
 }
 
 /**

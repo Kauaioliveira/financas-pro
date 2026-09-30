@@ -33,6 +33,10 @@ const CreditCardView = lazy(async () => ({
   default: (await import('./components/CreditCardView')).CreditCardView,
 }));
 
+const BudgetView = lazy(async () => ({
+  default: (await import('./components/BudgetView')).BudgetView,
+}));
+
 const CategoryRules = lazy(async () => ({
   default: (await import('./components/CategoryRules')).CategoryRules,
 }));
@@ -80,19 +84,22 @@ function SecureApp() {
     importar: 'Importar Extrato',
     transacoes: 'Transações',
     credito: 'Cartão de Crédito',
+    orcamento: 'Orçamento',
     regras: 'Regras',
   };
 
   function renderContent() {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onOpenBudget={() => setActiveTab('orcamento')} />;
       case 'importar':
         return <ImportStatement />;
       case 'transacoes':
         return <TransactionList />;
       case 'credito':
         return <CreditCardView />;
+      case 'orcamento':
+        return <BudgetView />;
       case 'regras':
         return <CategoryRules />;
     }

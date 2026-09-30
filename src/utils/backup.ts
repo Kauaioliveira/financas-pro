@@ -22,6 +22,7 @@ const backupSchema = z.object({
   cardPurchases: z.array(z.unknown()).default([]),
   invoices: z.array(z.unknown()).default([]),
   rules: z.array(z.unknown()).default([]),
+  budgets: z.array(z.unknown()).optional(),
   exportDate: z.string().default(() => new Date().toISOString()),
 }).passthrough();
 
@@ -202,6 +203,7 @@ export function backupToVaultData(data: BackupData): Record<string, unknown> {
     card_purchases: data.cardPurchases,
     invoices: data.invoices,
     rules: data.rules,
+    budgets: data.budgets ?? [],
   };
 }
 

@@ -18,7 +18,7 @@ import type { VaultData } from '../vault';
  */
 
 /** Merged record by record, by id. */
-const ID_COLLECTIONS = ['transactions', 'cards', 'card_purchases', 'rules'] as const;
+const ID_COLLECTIONS = ['transactions', 'cards', 'card_purchases', 'rules', 'budgets'] as const;
 const INVOICES = 'invoices';
 
 type VaultRecord = Record<string, unknown> & { id: string };

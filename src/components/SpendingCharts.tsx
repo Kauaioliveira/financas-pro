@@ -21,7 +21,6 @@ import { formatCurrency, getMonthLabel } from '../utils/parser';
 import {
   buildCategoryHistory,
   MAX_HISTORY_MONTHS,
-  mergeCategoryItems,
   monthOf,
   OTHER_CATEGORY,
   projectSpending,
@@ -72,16 +71,7 @@ function colorFor(key: string, keys: string[]): string {
 }
 
 export function SpendingCharts({ selectedMonth, months }: { selectedMonth: string; months: string[] }) {
-  const { getMonthSummary, getMonthExpenseBreakdown, getCardExpenseBreakdown, getCardInvoicesByMonth } = useFinance();
-
-  const categoriesOf = useMemo(
-    () => (month: string) =>
-      mergeCategoryItems([
-        getMonthExpenseBreakdown(month).byCategory,
-        getCardExpenseBreakdown(month).invoiceBreakdown.byCategory,
-      ]),
-    [getMonthExpenseBreakdown, getCardExpenseBreakdown]
-  );
+  const { getMonthSummary, getMonthCategoryTotals: categoriesOf, getCardInvoicesByMonth } = useFinance();
 
   // Janela de até 6 meses terminando no mês escolhido, do mais antigo ao mais novo.
   const windowMonths = useMemo(

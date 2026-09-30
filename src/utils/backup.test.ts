@@ -156,6 +156,7 @@ describe('backup v2', () => {
       card_purchases: DATA.cardPurchases,
       invoices: DATA.invoices,
       rules: DATA.rules,
+      budgets: [],
     });
     await expect(exportBackupV2(JSON.stringify(DATA), dataKey, { kit: null, password: null })).rejects.toThrow(
       'Não foi possível montar o backup.',

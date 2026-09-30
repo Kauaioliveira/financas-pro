@@ -167,13 +167,38 @@ describe('mergeVaults: every collection', () => {
       cards: [{ id: 'c1', name: 'Nubank' }],
       card_purchases: [{ id: 'p1', amount: -30 }],
       rules: [{ id: 'r1', match: 'uber', category: 'Transporte' }],
+      budgets: [],
     });
     expect(merged.conflicts).toBe(0);
   });
 
-  it('always answers with the five collections, even for an empty vault', () => {
+  it('merges budgets by id: a limit set on each device keeps both, the same category keeps this device', () => {
+    const base = { budgets: [{ id: 'budget:mercado', category: 'Mercado', limit: 1000 }] };
+    const local = {
+      budgets: [
+        { id: 'budget:mercado', category: 'Mercado', limit: 1200 },
+        { id: 'budget:lazer', category: 'Lazer', limit: 300 },
+      ],
+    };
+    const remote = {
+      budgets: [
+        { id: 'budget:mercado', category: 'Mercado', limit: 900 },
+        { id: 'budget:saude', category: 'Saude', limit: 200 },
+      ],
+    };
+
+    const merged = mergeVaults(base, local, remote)!;
+    expect(merged.data.budgets).toEqual([
+      { id: 'budget:mercado', category: 'Mercado', limit: 1200 },
+      { id: 'budget:lazer', category: 'Lazer', limit: 300 },
+      { id: 'budget:saude', category: 'Saude', limit: 200 },
+    ]);
+    expect(merged.conflicts).toBe(1);
+  });
+
+  it('always answers with the six collections, even for an empty vault', () => {
     const merged = mergeVaults({}, {}, {})!;
-    expect(merged.data).toEqual({ transactions: [], cards: [], card_purchases: [], invoices: [], rules: [] });
+    expect(merged.data).toEqual({ transactions: [], cards: [], card_purchases: [], invoices: [], rules: [], budgets: [] });
   });
 
   it('merges a key the app does not know yet, keeping the local side on a conflict', () => {
