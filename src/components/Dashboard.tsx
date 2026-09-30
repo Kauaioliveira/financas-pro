@@ -27,6 +27,8 @@ import {
 import { useFinance } from '../context/useFinance';
 import type { ExpenseBreakdown, ExpenseBreakdownItem } from '../types';
 import { formatCurrency, formatDate, getMonthLabel } from '../utils/parser';
+import { mergeCategoryItems } from '../utils/projection';
+import { SpendingCharts } from './SpendingCharts';
 
 const axisStyle = { fontSize: 12, fill: '#94a3b8' } as const;
 const tooltipStyle = {
@@ -39,43 +41,11 @@ const tooltipStyle = {
 
 type DashboardFilter = 'all' | 'bank' | 'card' | 'consolidated';
 
-function normalizeItems(items: ExpenseBreakdownItem[]): ExpenseBreakdownItem[] {
-  const total = items.reduce((sum, item) => sum + item.amount, 0);
-  return items
-    .map(item => ({
-      ...item,
-      share: total > 0 ? item.amount / total : 0,
-    }))
-    .sort((a, b) => b.amount - a.amount || a.label.localeCompare(b.label));
-}
-
-function mergeItems(groups: ExpenseBreakdownItem[][]): ExpenseBreakdownItem[] {
-  const map = new Map<string, { amount: number; count: number }>();
-
-  for (const items of groups) {
-    for (const item of items) {
-      const current = map.get(item.label) || { amount: 0, count: 0 };
-      current.amount += item.amount;
-      current.count += item.count;
-      map.set(item.label, current);
-    }
-  }
-
-  return normalizeItems(
-    Array.from(map.entries()).map(([label, item]) => ({
-      label,
-      amount: item.amount,
-      count: item.count,
-      share: 0,
-    }))
-  );
-}
-
 function mergeBreakdowns(breakdowns: ExpenseBreakdown[]): ExpenseBreakdown {
   const total = breakdowns.reduce((sum, breakdown) => sum + breakdown.total, 0);
-  const byCategory = mergeItems(breakdowns.map(breakdown => breakdown.byCategory));
-  const byType = mergeItems(breakdowns.map(breakdown => breakdown.byType));
-  const topMerchants = mergeItems(breakdowns.map(breakdown => breakdown.topMerchants)).slice(0, 3);
+  const byCategory = mergeCategoryItems(breakdowns.map(breakdown => breakdown.byCategory));
+  const byType = mergeCategoryItems(breakdowns.map(breakdown => breakdown.byType));
+  const topMerchants = mergeCategoryItems(breakdowns.map(breakdown => breakdown.topMerchants)).slice(0, 3);
 
   return {
     byCategory,
@@ -362,6 +332,8 @@ export function Dashboard() {
           </div>
         </SectionShell>
       </section>
+
+      <SpendingCharts selectedMonth={selectedMonth} months={months} />
 
       <section className="dark-surface rounded-[16px] sm:rounded-[24px] p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
