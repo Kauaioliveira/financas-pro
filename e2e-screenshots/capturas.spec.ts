@@ -103,7 +103,7 @@ async function capturar(page: Page, arquivo: string) {
 }
 
 test.describe('Capturas do README', () => {
-  test('gera as cinco imagens com a conta de demonstração', async ({ page }) => {
+  test('gera as sete imagens com a conta de demonstração', async ({ page }) => {
     await page.clock.setFixedTime(HOJE);
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
@@ -171,6 +171,12 @@ test.describe('Capturas do README', () => {
     await irParaAba(page, /dashboard/i);
     await page.locator('select.dashboard-select').selectOption(MES_EM_FOCO);
     await capturar(page, 'dashboard.png');
+
+    await trazerParaOTopo(page.locator('section').filter({ hasText: /para onde foi em/i }).first());
+    await capturar(page, 'charts.png');
+
+    await trazerParaOTopo(page.locator('section[aria-labelledby="projecao-titulo"]'));
+    await capturar(page, 'projection.png');
 
     // --- Login (a conta já existe, então a tela mostra o estado real) ---
     await page.getByTitle('Sair').click();
