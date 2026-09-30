@@ -4,6 +4,8 @@
 
 Personal finance manager with real end-to-end encryption. Imports bank statements and credit card invoices, consolidates monthly spending by category, and protects everything with AES-256. Your data is never stored in readable form.
 
+**Open it:** [financas-pro-8hq.pages.dev](https://financas-pro-8hq.pages.dev) — deployed to Cloudflare Pages on every push to `main`. On a phone you can install it as an app ([how to install](#installing-on-a-phone-or-a-computer)).
+
 The app runs **100% in the browser by default**: no account, no server, no telemetry. There is an **optional cloud mode** (Supabase + Cloudflare) that adds email accounts and sync across devices — and it only reaches the app if whoever deploys it sets two build variables.
 
 The app interface is in Brazilian Portuguese; UI labels below are quoted as they appear on screen.
@@ -18,11 +20,15 @@ The app interface is in Brazilian Portuguese; UI labels below are quoted as they
 |---|---|
 | ![Statement import with automatic categorization](docs/screenshots/import.png) | ![Credit card module](docs/screenshots/credit-card.png) |
 
+| Spending by category | Spending projection |
+|---|---|
+| ![Donut of this month's spending by category and stacked bars for recent months](docs/screenshots/charts.png) | ![Projection for the next 3 months with a likely range](docs/screenshots/projection.png) |
+
 | Recovery kit |
 |---|
 | ![Recovery kit with the 12 words and the kit id](docs/screenshots/recovery-kit.png) |
 
-The images come from the real app, with made-up sample data: `npm run screenshots` registers a demo account, imports the sample statement and the sample invoice, and regenerates all five captures. The script and the sample files live in [`e2e-screenshots/`](e2e-screenshots).
+The images come from the real app, with made-up sample data: `npm run screenshots` registers a demo account, imports the sample statement and the sample invoice, and regenerates all seven captures. The script and the sample files live in [`e2e-screenshots/`](e2e-screenshots).
 
 ## Why it's different
 
@@ -110,6 +116,8 @@ Deploying: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) (database, auth,
 - **Recovery kit** with a short id and a printable sheet, created with the account (at sign-up in local mode, in **Configurar cofre** in cloud mode) and renewable in settings.
 - **Encrypted backup** that opens with the kit or with the account password of the time.
 - Monthly dashboard: income, account outflows, invoices in their due month, and open card purchases.
+- **Spending charts**: a donut with this month's categories (account + invoices) and stacked bars with the top 5 categories of the last 6 months, each category always in the same color.
+- **Spending projection** for the current month and the next 2: weighted average of the last closed months (recent months weigh more), a capped trend, and a likely range. It never goes below the invoices you already owe, so an installment purchase shows up in the month it will hit. Full rule in [`src/utils/projection.ts`](src/utils/projection.ts).
 - Spend breakdown by category, type, and merchant (with filters).
 - Automatic categorization rules (match on part of the description).
 - Local authentication with rate limiting (5 attempts, 5-minute lockout).
@@ -282,6 +290,10 @@ Access is **closed by an email allowlist** (`beta_allowlist` plus the *Before Us
 
 ### Phase 3 — Before opening it to other people
 
-- In-app feedback screen (the `feedback` table already exists in the database; the screen does not)
-- Privacy and terms page, plus the consent screens
+- ~~In-app feedback screen~~ (done: **Dar opinião**, in cloud mode)
+- ~~Privacy and terms page, plus the consent screens~~ (done)
 - Pre-go-live checklist and threat model documentation
+
+### Phase 4 — Complete personal finance
+
+Spending charts and projection (done). Next, in order: per-category budgets with automatic suggestions, fixed bills and subscriptions, expected month-end balance, goals with deadlines, and a net-worth view. Detailed plan (in Portuguese): [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).

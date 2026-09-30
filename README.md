@@ -4,6 +4,8 @@
 
 Gerenciador financeiro pessoal com criptografia ponta a ponta. Importa extratos bancários e faturas de cartão de crédito, consolida os gastos mensais por categoria e protege tudo com AES-256. Seus dados nunca ficam gravados em texto legível.
 
+**Acesse:** [financas-pro-8hq.pages.dev](https://financas-pro-8hq.pages.dev) — publicado no Cloudflare Pages a cada push na `main`. No celular, dá para instalar como aplicativo ([como instalar](#instalar-no-celular-e-no-computador)).
+
 O app roda **100% no navegador por padrão**: sem conta, sem servidor, sem telemetria. Existe um **modo nuvem opcional** (Supabase + Cloudflare) que liga conta por e-mail e sincronização entre aparelhos — e que só entra no aplicativo se quem publica configurar duas variáveis de ambiente.
 
 ## Screenshots
@@ -16,11 +18,15 @@ O app roda **100% no navegador por padrão**: sem conta, sem servidor, sem telem
 |---|---|
 | ![Importar extrato com categorização automática](docs/screenshots/import.png) | ![Módulo de cartão de crédito](docs/screenshots/credit-card.png) |
 
+| Gastos por categoria | Projeção de gastos |
+|---|---|
+| ![Rosca com os gastos do mês por categoria e barras empilhadas dos últimos meses](docs/screenshots/charts.png) | ![Projeção dos próximos 3 meses com faixa provável](docs/screenshots/projection.png) |
+
 | Kit de recuperação |
 |---|
 | ![Kit de recuperação com as 12 palavras e o id do kit](docs/screenshots/recovery-kit.png) |
 
-As imagens saem do app de verdade, com dados de exemplo inventados: `npm run screenshots` cadastra uma conta de demonstração, importa o extrato e a fatura de exemplo e refaz as cinco capturas. O roteiro e os arquivos de exemplo estão em [`e2e-screenshots/`](e2e-screenshots).
+As imagens saem do app de verdade, com dados de exemplo inventados: `npm run screenshots` cadastra uma conta de demonstração, importa o extrato e a fatura de exemplo e refaz as sete capturas. O roteiro e os arquivos de exemplo estão em [`e2e-screenshots/`](e2e-screenshots).
 
 ## Por que é diferente
 
@@ -108,6 +114,8 @@ Publicar: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) (banco, autentica
 - **Kit de recuperação** com id curto e folha imprimível, criado junto com a conta (no cadastro, no modo local; em **Configurar cofre**, no modo nuvem) e renovável em Configurações.
 - **Backup cifrado** que abre com o kit ou com a senha da conta da época.
 - Dashboard mensal: entradas, saídas em conta, faturas no mês de vencimento e compras abertas.
+- **Gráficos de gastos**: rosca com as categorias do mês (conta + faturas) e barras empilhadas com as 5 maiores categorias dos últimos 6 meses, cada categoria sempre com a mesma cor.
+- **Projeção de gastos** para o mês atual e os 2 seguintes: média dos últimos meses fechados (mais peso para os recentes), tendência limitada e faixa provável. A projeção nunca fica abaixo das faturas que você já tem para pagar, então uma compra parcelada aparece no mês em que vai pesar. Regra completa em [`src/utils/projection.ts`](src/utils/projection.ts).
 - Composição de gastos por categoria, tipo e comerciante (com filtros).
 - Regras de categorização automática (por trecho da descrição).
 - Autenticação local com rate limit (5 tentativas, bloqueio de 5 min).
@@ -264,6 +272,7 @@ Pontos de entrada principais:
 | `src/lib/vault/` | `VaultStore` (local e nuvem) e o gravador com fila |
 | `src/utils/secureStorage.ts` | Cofre cifrado no `localStorage`, com erros tipados |
 | `src/context/FinanceContext.tsx` | Estado central e agregações financeiras |
+| `src/utils/projection.ts` | Projeção de gastos e histórico por categoria dos gráficos |
 | `src/pwa/sw-template.js` | Service worker: precache dos estáticos e nada de dado do usuário |
 | `src/utils/backup.ts` | Backup v2 (kit ou senha) e leitura dos formatos antigos |
 | `supabase/migrations/0001_init.sql` | Tabelas, políticas e funções do banco |
@@ -282,6 +291,10 @@ O acesso é **fechado por lista de e-mails** (`beta_allowlist` + hook *Before Us
 
 ### Fase 3 — Antes de abrir para outras pessoas
 
-- Tela de opinião dentro do app (a tabela `feedback` já existe no banco; a tela, não)
-- Página de privacidade e termos, e as telas de consentimento
+- ~~Tela de opinião dentro do app~~ (feita: **Dar opinião**, no modo nuvem)
+- ~~Página de privacidade e termos, e as telas de consentimento~~ (feitas)
 - Checklist pré-go-live e documentação do modelo de ameaças
+
+### Fase 4 — Finanças pessoais completas
+
+Gráficos de gastos e projeção (feitos). Próximos passos, em ordem: orçamento por categoria com sugestão automática, contas fixas e assinaturas, saldo previsto do mês, metas com prazo e visão de patrimônio. Plano detalhado em [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).

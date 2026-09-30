@@ -6,6 +6,10 @@ Mudanças relevantes para quem usa o FinançasPro. O formato segue o [Keep a Cha
 
 ### Adicionado
 
+- **Gráficos de gastos no painel**: rosca com as categorias do mês escolhido (conta + faturas) e barras empilhadas com as 5 maiores categorias dos últimos 6 meses. Cada categoria mantém a mesma cor nos dois gráficos; o resto vira **Outros**.
+- **Projeção de gastos** para o mês atual e os 2 seguintes, com faixa provável, média mensal, tendência e o total **já comprometido no cartão**. A projeção usa só meses fechados e nunca fica abaixo das faturas que já existem para cada mês.
+- **Plano de evolução** para finanças pessoais completas: [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).
+
 - **Instalar como aplicativo (PWA)**: ícone na tela inicial do celular e do computador, janela própria e abertura **sem internet**. No modo local o app funciona inteiro offline; no modo nuvem ele abre pelo cache e mostra **Sem sincronizar**. Só os arquivos do app ficam guardados: nenhuma resposta do servidor, nem o cofre cifrado, entra em cache. Versão nova nunca é aplicada sozinha — aparece o aviso **Nova versão do FinançasPro disponível** com o botão **Atualizar agora**.
 - **Kit de recuperação renovável.** Em **Configurações → Kit de recuperação → Gerar kit novo**, o app pede a senha da conta, mostra uma folha imprimível com id curto e data, pede **3 palavras sorteadas** e só então gira a chave dos dados e grava. O kit anterior deixa de abrir a conta.
 - **Folha imprimível do kit**, com id, data, as 12 palavras numeradas e instruções de uso, no cadastro e a cada kit novo.
