@@ -6,6 +6,7 @@ import {
   CreditCard,
   Wand2,
   Wallet,
+  PiggyBank,
   X,
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ const tabs: {
   { id: 'importar', label: 'Importar Extrato', hint: 'entrada de dados', icon: Upload },
   { id: 'transacoes', label: 'Transações', hint: 'movimentos', icon: List },
   { id: 'credito', label: 'Cartão de Crédito', hint: 'faturas', icon: CreditCard },
+  { id: 'orcamento', label: 'Orçamento', hint: 'tetos do mês', icon: PiggyBank },
   { id: 'regras', label: 'Regras', hint: 'automação', icon: Wand2 },
 ];
 

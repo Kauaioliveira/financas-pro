@@ -41,7 +41,7 @@ export function monthOf(date: Date): string {
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}`;
 }
 
-function weightedAverage(values: number[]): number {
+export function weightedAverage(values: number[]): number {
   // Pesos 1, 2, 3...: o mês mais recente pesa mais.
   let sum = 0;
   let weights = 0;

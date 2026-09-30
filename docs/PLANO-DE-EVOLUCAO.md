@@ -8,12 +8,12 @@ categoria e uma **projeção dos próximos 3 meses**. O que ainda falta é respo
 A ordem abaixo segue um critério: cada etapa usa os dados que o app já tem e deixa o próximo passo
 mais útil. Tudo continua cifrado de ponta a ponta, como hoje.
 
-## Etapa 1 — Planejar o mês (próximo passo)
+## Etapa 1 — Planejar o mês (em andamento)
 
 | Recurso | O que resolve | Base que já existe |
 |---|---|---|
-| **Orçamento por categoria** | Definir um teto para Alimentação, Lazer etc. e ver no painel quanto já foi usado, com aviso ao passar de 80% e de 100%. | Categorias, regras e a composição do mês. |
-| **Orçamento sugerido** | Propor o teto de cada categoria a partir da média dos últimos meses, para ninguém começar do zero. | A mesma média ponderada da projeção (`src/utils/projection.ts`). |
+| **Orçamento por categoria** (feito) | Definir um teto para Alimentação, Lazer etc. e ver no painel quanto já foi usado, com aviso ao passar de 80% e de 100%. | Categorias, regras e a composição do mês. |
+| **Orçamento sugerido** (feito) | Propor o teto de cada categoria a partir da média dos últimos meses, para ninguém começar do zero. | A mesma média ponderada da projeção (`src/utils/projection.ts`). |
 | **Contas fixas e assinaturas** | Detectar o que se repete todo mês (aluguel, condomínio, streaming) e listar com dia e valor. | Descrições e valores dos extratos importados. |
 | **Saldo previsto do mês** | Entradas esperadas menos contas fixas, faturas já conhecidas e projeção do resto. | Projeção de gastos e faturas futuras. |
 
@@ -49,5 +49,6 @@ mais útil. Tudo continua cifrado de ponta a ponta, como hoje.
 
 ## Por onde começar
 
-A recomendação é começar pelo **orçamento por categoria com sugestão automática**: é o que
-transforma os gráficos novos em decisão, e todos os dados que ele precisa já estão no cofre.
+O **orçamento por categoria com sugestão automática** já está no app (aba **Orçamento**). O próximo
+passo recomendado é **contas fixas e assinaturas**: com elas o saldo previsto do mês fica confiável,
+porque separa o que vai sair de qualquer jeito do que ainda dá para ajustar.

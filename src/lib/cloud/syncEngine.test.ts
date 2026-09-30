@@ -212,7 +212,7 @@ describe('sync: three-way merge between devices', () => {
 
   /** What the app always writes: the five collections, even when empty. */
   function full(data: VaultData): VaultData {
-    return { transactions: [], cards: [], card_purchases: [], invoices: [], rules: [], ...data };
+    return { transactions: [], cards: [], card_purchases: [], invoices: [], rules: [], budgets: [], ...data };
   }
 
   it('joins the changes of both devices without asking, and tells the open app', async () => {

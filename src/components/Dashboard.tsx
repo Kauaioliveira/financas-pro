@@ -29,6 +29,7 @@ import type { ExpenseBreakdown, ExpenseBreakdownItem } from '../types';
 import { formatCurrency, formatDate, getMonthLabel } from '../utils/parser';
 import { mergeCategoryItems } from '../utils/projection';
 import { SpendingCharts } from './SpendingCharts';
+import { BudgetSummary } from './BudgetSummary';
 
 const axisStyle = { fontSize: 12, fill: '#94a3b8' } as const;
 const tooltipStyle = {
@@ -56,7 +57,7 @@ function mergeBreakdowns(breakdowns: ExpenseBreakdown[]): ExpenseBreakdown {
   };
 }
 
-export function Dashboard() {
+export function Dashboard({ onOpenBudget }: { onOpenBudget?: () => void } = {}) {
   const {
     transactions,
     getMonthSummary,
@@ -332,6 +333,8 @@ export function Dashboard() {
           </div>
         </SectionShell>
       </section>
+
+      <BudgetSummary month={selectedMonth} onOpenBudget={onOpenBudget} />
 
       <SpendingCharts selectedMonth={selectedMonth} months={months} />
 

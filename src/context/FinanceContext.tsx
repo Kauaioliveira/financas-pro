@@ -6,6 +6,7 @@ import type {
   CardInvoice,
   CardMonthSnapshot,
   CardPurchase,
+  CategoryBudget,
   CategoryRule,
   ExpenseBreakdown,
   ExpenseBreakdownItem,
@@ -20,6 +21,8 @@ import { mergeImportedCardPurchases, mergeImportedTransactions } from '../utils/
 import type { ImportMergeResult } from '../utils/importMerge';
 import { getInvoiceCloseDate, getInvoiceDueDate, getInvoiceStatus } from '../utils/credit';
 import { FinanceContext } from './FinanceContext.shared';
+import { budgetId } from '../utils/budget';
+import { mergeCategoryItems } from '../utils/projection';
 
 function getPreviousMonth(month: string): string {
   const [year, monthValue] = month.split('-').map(Number);
@@ -177,6 +180,7 @@ export function FinanceProvider({
   const [storedCardPurchases, setStoredCardPurchases] = useState<CardPurchase[]>([]);
   const [storedInvoices, setStoredInvoices] = useState<CardInvoice[]>([]);
   const [rules, setRules] = useState<CategoryRule[]>([]);
+  const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [saver] = useState(() => createVaultSaver(store));
@@ -190,6 +194,7 @@ export function FinanceProvider({
     setStoredCardPurchases(safeArray(backupShape ? data.cardPurchases : data.card_purchases));
     setStoredInvoices(safeArray(data.invoices));
     if (!backupShape || data.rules !== undefined) setRules(safeArray(data.rules));
+    if (!backupShape || data.budgets !== undefined) setBudgets(safeArray(data.budgets));
   }, []);
 
   // Load the vault once per mount (or per explicit retry). A new store for the same
@@ -260,8 +265,9 @@ export function FinanceProvider({
       card_purchases: storedCardPurchases,
       invoices: storedInvoices,
       rules,
+      budgets,
     });
-  }, [loaded, saver, store, transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
+  }, [loaded, saver, store, transactions, cardAccounts, storedCardPurchases, storedInvoices, rules, budgets]);
 
   // Pending edits are written, not dropped: when the page is hidden and when the
   // provider unmounts (sign out, lock). The saver uses the latest store, and a
@@ -383,6 +389,18 @@ export function FinanceProvider({
     setStoredCardPurchases([]);
     setStoredInvoices([]);
     setRules([]);
+    setBudgets([]);
+  }, []);
+
+  const setBudget = useCallback((category: string, limit: number | null) => {
+    const id = budgetId(category);
+    setBudgets(prev => {
+      const others = prev.filter(budget => budget.id !== id);
+      if (limit === null || !Number.isFinite(limit) || limit <= 0) return others;
+      return [...others, { id, category: category.trim(), limit }].sort((a, b) =>
+        a.category.localeCompare(b.category)
+      );
+    });
   }, []);
 
   const exportFinanceBackup = useCallback((): string => {
@@ -392,9 +410,10 @@ export function FinanceProvider({
       cardPurchases: storedCardPurchases,
       invoices: storedInvoices,
       rules,
+      budgets,
       exportDate: new Date().toISOString(),
     }, null, 2);
-  }, [transactions, cardAccounts, storedCardPurchases, storedInvoices, rules]);
+  }, [transactions, cardAccounts, storedCardPurchases, storedInvoices, rules, budgets]);
 
   const importFinanceBackup = useCallback((jsonString: string) => {
     applyData(JSON.parse(jsonString), true);
@@ -533,6 +552,15 @@ export function FinanceProvider({
     [getMonthInvoicePurchases, getOpenPurchasesForMonth]
   );
 
+  const getMonthCategoryTotals = useCallback(
+    (month: string) =>
+      mergeCategoryItems([
+        getMonthExpenseBreakdown(month).byCategory,
+        getCardExpenseBreakdown(month).invoiceBreakdown.byCategory,
+      ]),
+    [getMonthExpenseBreakdown, getCardExpenseBreakdown]
+  );
+
   const getMonthComparison = useCallback(
     (month: string): MonthComparisonSummary => {
       const currentTotal = getMonthSummary(month).totalGastos;
@@ -589,6 +617,9 @@ export function FinanceProvider({
         cardInvoices,
         rules,
         setRules,
+        budgets,
+        setBudget,
+        getMonthCategoryTotals,
         addTransactions,
         addCardAccount,
         updateCardAccount,

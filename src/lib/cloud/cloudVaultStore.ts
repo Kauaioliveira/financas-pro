@@ -13,7 +13,7 @@ export interface CloudVaultStoreOptions {
 }
 
 /** Collections the app always writes; a vault without one of them means an empty list. */
-const COLLECTIONS = ['transactions', 'cards', 'card_purchases', 'invoices', 'rules'];
+const COLLECTIONS = ['transactions', 'cards', 'card_purchases', 'invoices', 'rules', 'budgets'];
 
 /**
  * Same content, same string: top-level keys sorted and missing collections as [].

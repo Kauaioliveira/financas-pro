@@ -125,4 +125,11 @@ export interface CategoryRule {
   enabled: boolean;
 }
 
-export type TabType = 'dashboard' | 'transacoes' | 'importar' | 'credito' | 'regras';
+/** Teto mensal de gastos de uma categoria. O id deriva da categoria (ver budgetId). */
+export interface CategoryBudget {
+  id: string;
+  category: string;
+  limit: number;
+}
+
+export type TabType = 'dashboard' | 'transacoes' | 'importar' | 'credito' | 'orcamento' | 'regras';

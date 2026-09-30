@@ -22,11 +22,11 @@ O app roda **100% no navegador por padrão**: sem conta, sem servidor, sem telem
 |---|---|
 | ![Rosca com os gastos do mês por categoria e barras empilhadas dos últimos meses](docs/screenshots/charts.png) | ![Projeção dos próximos 3 meses com faixa provável](docs/screenshots/projection.png) |
 
-| Kit de recuperação |
-|---|
-| ![Kit de recuperação com as 12 palavras e o id do kit](docs/screenshots/recovery-kit.png) |
+| Orçamento por categoria | Kit de recuperação |
+|---|---|
+| ![Aba Orçamento com o teto de cada categoria e quanto já foi usado](docs/screenshots/budget.png) | ![Kit de recuperação com as 12 palavras e o id do kit](docs/screenshots/recovery-kit.png) |
 
-As imagens saem do app de verdade, com dados de exemplo inventados: `npm run screenshots` cadastra uma conta de demonstração, importa o extrato e a fatura de exemplo e refaz as sete capturas. O roteiro e os arquivos de exemplo estão em [`e2e-screenshots/`](e2e-screenshots).
+As imagens saem do app de verdade, com dados de exemplo inventados: `npm run screenshots` cadastra uma conta de demonstração, importa o extrato e a fatura de exemplo e refaz as oito capturas. O roteiro e os arquivos de exemplo estão em [`e2e-screenshots/`](e2e-screenshots).
 
 ## Por que é diferente
 
@@ -116,6 +116,7 @@ Publicar: [`docs/deploy/supabase.md`](docs/deploy/supabase.md) (banco, autentica
 - Dashboard mensal: entradas, saídas em conta, faturas no mês de vencimento e compras abertas.
 - **Gráficos de gastos**: rosca com as categorias do mês (conta + faturas) e barras empilhadas com as 5 maiores categorias dos últimos 6 meses, cada categoria sempre com a mesma cor.
 - **Projeção de gastos** para o mês atual e os 2 seguintes: média dos últimos meses fechados (mais peso para os recentes), tendência limitada e faixa provável. A projeção nunca fica abaixo das faturas que você já tem para pagar, então uma compra parcelada aparece no mês em que vai pesar. Regra completa em [`src/utils/projection.ts`](src/utils/projection.ts).
+- **Orçamento por categoria** (aba **Orçamento**): um teto mensal por categoria, com a sugestão de cada teto calculada pela média dos últimos meses fechados (botão **Usar as sugestões**). Cada categoria mostra quanto do teto já foi usado no mês, com aviso de **Atenção** a partir de 80% e **Estourou** a partir de 100%, e o painel traz o resumo do mês. Os tetos ficam no cofre cifrado, entram no backup e sincronizam entre aparelhos.
 - Composição de gastos por categoria, tipo e comerciante (com filtros).
 - Regras de categorização automática (por trecho da descrição).
 - Autenticação local com rate limit (5 tentativas, bloqueio de 5 min).
@@ -297,4 +298,4 @@ O acesso é **fechado por lista de e-mails** (`beta_allowlist` + hook *Before Us
 
 ### Fase 4 — Finanças pessoais completas
 
-Gráficos de gastos e projeção (feitos). Próximos passos, em ordem: orçamento por categoria com sugestão automática, contas fixas e assinaturas, saldo previsto do mês, metas com prazo e visão de patrimônio. Plano detalhado em [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).
+Gráficos de gastos e projeção (feitos) e orçamento por categoria com sugestão automática (feito). Próximos passos, em ordem: contas fixas e assinaturas, saldo previsto do mês, metas com prazo e visão de patrimônio. Plano detalhado em [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).

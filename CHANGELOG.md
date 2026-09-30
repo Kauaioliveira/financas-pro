@@ -6,6 +6,7 @@ Mudanças relevantes para quem usa o FinançasPro. O formato segue o [Keep a Cha
 
 ### Adicionado
 
+- **Orçamento por categoria** na aba nova **Orçamento**: teto mensal por categoria, sugestão de cada teto pela média ponderada dos últimos meses fechados (arredondada para cima, em múltiplos de R$ 10) e o botão **Usar as sugestões** para as categorias ainda sem teto. Para o mês escolhido, cada categoria mostra o gasto contra o teto (conta + faturas do mês), com **Atenção** a partir de 80% e **Estourou** a partir de 100%. O painel ganhou um resumo do orçamento do mês. Os tetos ficam no cofre cifrado, entram no backup e se juntam por categoria na sincronização entre aparelhos.
 - **Gráficos de gastos no painel**: rosca com as categorias do mês escolhido (conta + faturas) e barras empilhadas com as 5 maiores categorias dos últimos 6 meses. Cada categoria mantém a mesma cor nos dois gráficos; o resto vira **Outros**.
 - **Projeção de gastos** para o mês atual e os 2 seguintes, com faixa provável, média mensal, tendência e o total **já comprometido no cartão**. A projeção usa só meses fechados e nunca fica abaixo das faturas que já existem para cada mês.
 - **Plano de evolução** para finanças pessoais completas: [`docs/PLANO-DE-EVOLUCAO.md`](docs/PLANO-DE-EVOLUCAO.md).

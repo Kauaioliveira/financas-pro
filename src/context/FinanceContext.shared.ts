@@ -5,8 +5,10 @@ import type {
   CardInvoice,
   CardMonthSnapshot,
   CardPurchase,
+  CategoryBudget,
   CategoryRule,
   ExpenseBreakdown,
+  ExpenseBreakdownItem,
   MonthSummary,
   MonthComparisonSummary,
   Transaction,
@@ -20,6 +22,11 @@ export interface FinanceContextType {
   cardInvoices: CardInvoice[];
   rules: CategoryRule[];
   setRules: (rules: CategoryRule[]) => void;
+  budgets: CategoryBudget[];
+  /** Define o teto mensal de uma categoria; null ou 0 remove. */
+  setBudget: (category: string, limit: number | null) => void;
+  /** Gastos do mês por categoria: saídas em conta mais faturas que vencem no mês. */
+  getMonthCategoryTotals: (month: string) => ExpenseBreakdownItem[];
   addTransactions: (newTransactions: Transaction[]) => ImportMergeResult;
   addCardAccount: (card: CardAccount) => void;
   updateCardAccount: (card: CardAccount) => void;
